@@ -34,29 +34,71 @@ def ParisCalculating(c, m, dk):
     return dadn
 
 
-def WalkerFitting(dadn, dk, r=0.1):
-    # usage: 通过离散的dadn, dk，r数据点拟合Walker模型，输出Paris公式参数C0，m0, gamma
+def WalkerFittingFromParis(c, m, r):
+    # usage: 通过不同应力比下的Paris参数拟合Walker模型，输出Walker模型参数C0，m0, gamma
+    # NOTE: 该方法参考论文 Modelling the fatigue crack growth in friction stir welded joint of 2024-T351 Al alloy
+    # m0取不同应力比下paris参数m的平均值
+    # c0和gamma则由不同应力比R下的Paris参数C关系（应变量R-自变量C）的线性拟合得到
     # input parameter:
-    # dadn：裂纹扩展速率，单位 mm/cycles
-    # dk：SIF变幅，单位 MPa.m0.5
-    # r：应力比，无量纲，默认r = 0.1
+    # c: 数组，不同应力比下对应的Paris参数C
+    # m：数组，不同应力比下对应的Paris参数m
+    # r：应力比
     # return parameter:
     # Walker公式参数C0，单位 mm/cycles
     # Walker公式参数m0，无量纲
     # Walker公式参数gamma，无量纲
     #
-    # 该函数尚未完工！！！
+    # 该函数尚待检验
     #
-    m0 = 3.39829
-    lndadn = np.log(dadn)
-    lndk = np.log(dk)
-    def residual_walker(p):
-        gamma_, logc0_ = p
-        return (lndadn - m0 * lndk) - (logc0_ - (1 - gamma_) * m0 * np.log(1 - r))  # 应力比R = 0.1
+    m = np.array(m)
+    m0 = np.average(m)
+    c = np.array(c)
+    Y = np.log(c)
+    r = np.array(r)
+    X = np.log(1 - r)
 
-    r = opt.leastsq(residual_walker, np.array([1e-7, 1.]))
-    gamma, logc0 = r[0]
-    c0 = np.exp(logc0)
+    def residual_walker(p):
+        K, B = p
+        return Y - (K*X + B)  # 应力比R = 0.1
+
+    r = opt.leastsq(residual_walker, np.array([1, 1]))
+    k, b = r[0]
+    c0 = np.exp(b)
+    gamma = (k + m0)/m0
+    return c0, m0, gamma
+
+
+def WalkerFittingByRegression(dadn1, dk1, r1, dadn2, dk2, r2):
+    # usage: 通过不同应力比实验得到的dadn和dk数据拟合Walker模型，输出Walker模型参数C0，m0, gamma
+    # NOTE: 目前只能拟合两个应力比的数据，值对数化后直接进行三元平面拟合
+    #      log(da/dN) = m*log(dk) + m(gamma-1)*log(1-r) + logc0
+    # =>        Z     = A*   X    +      B    *    Y    +   C
+    # input parameter:
+    # dadn1,dadn2：应力比r1和r2得到的裂纹扩展速率，单位 mm/cycles
+    # dk1,dadn2：应力比r1和r2得到的SIF变幅，单位 MPa.m0.5
+    # r1,r2：应力比，无量纲，默认r = 0.1
+    # return parameter:
+    # Walker公式参数C0，单位 mm/cycles
+    # Walker公式参数m0，无量纲
+    # Walker公式参数gamma，无量纲
+    #
+    # 该函数尚待检验
+    #
+    Z = np.concatenate((np.log(dadn1), np.log(dadn2)))
+    X = np.concatenate((np.log(dk1), np.log(dk2)))
+    r_1 = np.full(len(dadn1), r1)
+    r_2 = np.full(len(dadn2), r2)
+    Y = np.log(1 - np.concatenate((r_1, r_2)))
+
+    def residual_walker(p):
+        A, B, C = p
+        return Z - (A*X + B*Y + C)
+
+    r = opt.leastsq(residual_walker, np.array([1, 1, 1]))
+    a, b, c = r[0]
+    m0 = a
+    gamma = (b + m0)/m0
+    c0 = np.exp(c)
     return c0, m0, gamma
 
 
@@ -167,7 +209,7 @@ def LigamentValidCheck(w, a, dk, ys, r=0.1):
     # 布尔值，若符合韧带条件则返回True，反正返回False
     pi = 3.1415926
     kmax = dk / (1 - r)
-    if (w - a) >= (4 / pi) * (kmax / (ys * 1000)**2):
+    if (w - a) * 1e-3 >= (4. / pi) * (kmax / (ys * 1000))**2:
         return True
     else:
         return False
@@ -208,3 +250,25 @@ def DataSelectByThreshold(threshold, parameter, data):
         if value <= threshold:
             newdata.append(data[seq])
     return newdata
+
+
+def FindAscentDataBySeq(value, item, target):
+    # usage: 在item数组中找出与value值最接近的值，在target数组中找到对应的值返回
+    # 注意：要求item数组和target数组的排序是相同且是升序的，即行行数据对应
+    # 找出最近的两个值，进行线性插值返回
+    # input parameter:
+    # value: 要寻找的值
+    # item: 数组，函数将在item中寻找与value相近的值
+    # target: 数组，函数将返回item中与value相近值的序号相同的值并进行插值
+    # return parameter:
+    # result: 搜寻并拟合的值
+    seq = 0
+    while seq < len(item):
+        if item[seq] >= value:
+            ratio = (value - item[seq-1])/(item[seq] - item[seq-1])
+            result = target[seq-1] + ratio * (target[seq] - target[seq-1])
+            break
+        seq = seq + 1
+    return result
+
+

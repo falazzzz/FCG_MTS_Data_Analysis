@@ -79,3 +79,5 @@ def FCGR_DeltaK_Comparation(sequence, dk_MTS, dadn_MTS, dk_Manual, dadn_manual, 
         plt.savefig('dadn_dk_MTS_and_Manual'+sequence+'.png', dpi=320)
     if show:
         plt.show()
+
+# Temp
