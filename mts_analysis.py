@@ -1,4 +1,4 @@
-# 处理数据结果函数
+# 处理数据结果函数库
 
 import numpy as np
 import scipy.optimize as opt
@@ -47,9 +47,6 @@ def WalkerFittingFromParis(c, m, r):
     # Walker公式参数C0，单位 mm/cycles
     # Walker公式参数m0，无量纲
     # Walker公式参数gamma，无量纲
-    #
-    # 该函数尚待检验
-    #
     m = np.array(m)
     m0 = np.average(m)
     c = np.array(c)
@@ -64,7 +61,7 @@ def WalkerFittingFromParis(c, m, r):
     r = opt.leastsq(residual_walker, np.array([1, 1]))
     k, b = r[0]
     c0 = np.exp(b)
-    gamma = (k + m0)/m0
+    gamma = k/m0 + 1
     return c0, m0, gamma
 
 
@@ -94,7 +91,7 @@ def WalkerFittingByRegression(dadn1, dk1, r1, dadn2, dk2, r2):
         A, B, C = p
         return Z - (A*X + B*Y + C)
 
-    r = opt.leastsq(residual_walker, np.array([1, 1, 1]))
+    r = opt.leastsq(residual_walker, np.array([4., 0., -20.]))
     a, b, c = r[0]
     m0 = a
     gamma = (b + m0)/m0
@@ -112,7 +109,7 @@ def WalkerCalculating(c0, m0, gamma, dk, r):
     # r：需要计算的dk数据对应的应力比r，无量纲
     # return parameter:
     # dadn: 裂纹扩展速率，按推荐输入对应单位为 mm/cycles
-    dadn = c0 * (dk * (1 - r) ** (gamma - 1)) ** m0
+    dadn = c0 * ((dk *((1 - r)**(gamma - 1)))**m0)
     return dadn
 
 
@@ -172,7 +169,7 @@ def FCGRateBySecant(a, n, dk, select=True):
     # n: 循环次数
     # dk：SIF变幅，单位 MPa.m0.5
     # return parameter:
-    # deltaK：SIF变幅，单位 MPa.m0.5
+    # 更新的dadn, cracklength, cycles, dk
     dadn_secant = []
     cracklength_secant = []
     cycles_secant = []
@@ -195,6 +192,43 @@ def FCGRateBySecant(a, n, dk, select=True):
         cycles_secant.append(result[2])
         dk_secant.append(result[3])
     return dadn_secant, cracklength_secant, cycles_secant, dk_secant
+
+
+def FCGRateByPolynomial(a, n, dk, select=True, num=3):
+    # usage: 依据E647-11标准采用7点多项式拟合法计算裂纹扩展速率（FCGR）dadn
+    # Note: 由于Polynomial对数据进行了合并（7组计算一次）和筛选（略去FCGR<0的数据），
+    # 因此输出将对应更新FCGR，循环次数，SIF变幅，裂纹长度数组（缩短前后共2*num个数据点）
+    # input parameter:
+    # a: 裂纹长度（数组），单位 mm
+    # n: 循环次数
+    # dk：SIF变幅，单位 MPa.m0.5
+    # select：是否筛除计算得到dadn < 0的值，默认将筛除
+    # num：多项式拟合时选取的数据点数为2num+1，若取7点，则num=3，若取9点，则num=4，默认3
+    # return parameter:
+    # 更新的dadn, cracklength, cycles, dk
+    seq = num
+    dadn_poly = []
+    a_poly = []
+    n_poly = []
+    dk_poly = []
+    while seq < len(a) - num:
+        c1 = 0.5 * (n[seq - num] + n[seq + num])
+        c2 = 0.5 * (n[seq + num] - n[seq - num])
+        a_temp = a[seq - num:seq + num]
+        n_temp = n[seq - num:seq + num]
+        x = (n_temp - c1) / c2
+        p = np.polyfit(x, a_temp, deg=2)
+        b2, b1, _ = p
+        dadn_temp = b1 / c2 + 2 * b2 * (n[seq] - c1) / c2 ** 2
+        dadn_poly.append(dadn_temp)
+        seq = seq + 1
+        if select:
+            if dadn_temp < 0:
+                continue
+        a_poly.append(a[seq])
+        n_poly.append(n[seq])
+        dk_poly.append(dk[seq])
+    return dadn_poly, a_poly, n_poly, dk_poly
 
 
 def LigamentValidCheck(w, a, dk, ys, r=0.1):
@@ -238,7 +272,7 @@ def DataSelectByLigament(w, a, dk, ys, data, r=0.1):
 
 def DataSelectByThreshold(threshold, parameter, data):
     # usage: 根据门槛值threshold进行筛选，
-    # 若参考数组parameter的值小于等于阈值，则将排序对应的data数组中的数据保留，反之则丢弃
+    # 若参考数组parameter的值大于等于阈值，则将排序对应的data数组中的数据保留，反之则丢弃
     # input parameter:
     # threshold: 阈值
     # parameter：参考数组，将该数组的值与阈值对比
@@ -247,7 +281,7 @@ def DataSelectByThreshold(threshold, parameter, data):
     # newdata：筛选后的data数组
     newdata = []
     for seq, value in enumerate(parameter):
-        if value <= threshold:
+        if value >= threshold:
             newdata.append(data[seq])
     return newdata
 
@@ -262,7 +296,11 @@ def FindAscentDataBySeq(value, item, target):
     # target: 数组，函数将返回item中与value相近值的序号相同的值并进行插值
     # return parameter:
     # result: 搜寻并拟合的值
+    item = np.array(item)
     seq = 0
+    if value > item[-1] or value < item[0]:
+        result = 0
+        return result
     while seq < len(item):
         if item[seq] >= value:
             ratio = (value - item[seq-1])/(item[seq] - item[seq-1])

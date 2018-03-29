@@ -13,12 +13,12 @@ import matplotlib.pyplot as plt
 
 
 # 估计参数
-c = 8.22841144702e-10       # Paris公式参数，单位 mm/cycles
-m = 3.67040043154           # Parsi公式参数，无量纲
+c = 1.9421e-10       # Paris公式参数，单位 mm/cycles
+m = 4.2860           # Parsi公式参数，无量纲
 width = 40                  # CT试件尺寸Width，单位 mm
 thickness = 2.5             # CT试件尺寸厚度，单位 mm
 start = 10                  # Precrack结束长度a0，单位 mm
-final = 30                  # 估算的最大裂纹长度，单位 mm
+final = 20                  # 估算的最大裂纹长度，单位 mm
 load = [4000, 4500, 5000, 6000]         # 计算的载荷峰值，增加或删减需要对下方的主程序部分进行对应增减，单位 N
 stress_ratio = 0.7          # 应力比
 step = 1                    # 预估的裂纹扩展步长，单位 mm
@@ -27,7 +27,7 @@ yield_strength = 0.446      # 材料的屈服强度，单位 Gpa
 
 # 绘图参数
 sequence = 'R=0.7_QSTE420TM'            # 保存文件名和绘图标题名
-save = 0            # 保存开关
+save = 1            # 保存开关
 show = 1            # 显示开关
 
 
@@ -48,7 +48,7 @@ def predict(load):
     cycle = experiment_predict.CycleIntegrateBySimpson(c=c, m=m, dk=dk_predict, cracklength=cracklength)
     valid = []
     for seq, value in enumerate(cracklength):
-        valid.append(mts_analysis.LigamentValidCheck(w=width, a=value, dk=dk_predict[seq], ys=yield_strength))
+        valid.append(mts_analysis.LigamentValidCheck(w=width, a=value, dk=dk_predict[seq], ys=yield_strength, r=stress_ratio))
     return cracklength, dk_predict, dadn, cycle, valid
 
 

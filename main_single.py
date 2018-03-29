@@ -19,82 +19,50 @@
 
 import read_data
 import mts_analysis
-import plot
+import experiment_calculation
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 # 分析和绘图参数
 show = 0
 save = 0
-sequence = "yang-baoban_Lu-420-02"         # Graph Saving Sequence
-cracklength_for_overload = 14              # For Finding Part, Find the cycles when length = 10mm
-dk_for_overload = 25                       # For Finding Part, Find the cycles when SIF = 30 MPa.m0.5
-stress_ratio = 0.1                         # Stress Ratio
+sequence = "yang-baoban_Lu-420-04"         # Graph Saving Sequence
+cracklength_for_overload = 10              # For Finding Part, Find the cycles when length = 10mm
+dk_for_overload = 17                       # For Finding Part, Find the cycles when SIF = 30 MPa.m0.5
+stress_ratio = 0.7                         # Stress Ratio
+threshold = 15.2                              #Threshold for paris region selecting
 
-dadn_MTS, cycles_MTS, dk_MTS = read_data.ReadMtsResult(sequence=sequence)
-# mm for length, MPa.m0.5 for SIFs
 
-cycles, cracklength, kmax, kmin, pmax, pmin, codmax, codmin, = \
-    read_data.ReadOriginResult(sequence=sequence)
-# mm for length, MPa.m0.5 for SIFs
-
+# 实验基本参数读取
 specimen, width, notch_length, thickness, elastic_modulus, yield_strength, precrack_length = \
     read_data.ReadTestInf(sequence=sequence)
+print('specimen name:', str(specimen))
 # mm for length, GPa for strength and modulus
 
-print('specimen name:',str(specimen))
 
+# MTS数据读取和处理
+dadn_MTS, cycles_MTS, dk_MTS = read_data.ReadMtsResult(sequence=sequence)
 c_MTS, m_MTS = mts_analysis.ParisFitting(dadn=dadn_MTS, dk=dk_MTS)
-# Fitting Paris by MTS Result, returning Paris Parameters C and m
+dadn_paris_by_MTS = mts_analysis.ParisCalculating(c=c_MTS, m=m_MTS, dk=dk_MTS)
 print("MTS Results Fitting Result by Paris:c=", str(c_MTS), ",m=", str(m_MTS))
 
-dadn_paris_by_MTS = mts_analysis.ParisCalculating(c=c_MTS, m=m_MTS, dk=dk_MTS)
-dadn_reference = mts_analysis.ParisCalculating(c=4.4668e-8, m=2.3671, dk=dk_MTS)
-# Calculate MTS Result by Paris(Fitting), Walker(Fitting), Paris(Reference)
+# Calculate MTS Result by Paris(Fitting)
 
 
-# Original Data Analysis
+# 由裂纹长度、载荷、循环次数计算
+cycles, cracklength, kmax, kmin, pmax, pmin, codmax, codmin, = \
+    read_data.ReadOriginResult(sequence=sequence)
 
-cracklength_complience_max = mts_analysis.Compliance(e=elastic_modulus, b=thickness, w=width, p=pmax, v=codmax)
-cracklength_complience_min = mts_analysis.Compliance(e=elastic_modulus, b=thickness, w=width, p=pmin, v=codmin)
-cracklength_compliance = cracklength_complience_min     # 若取裂纹平均值改为(mina + maxa)/2
-# Calculate crack length by complience, return the max as the cracklength
-# 内部处理时采用柔度法计算裂纹长度时，考虑了90%/10%的Upper和Lower区间，此处处理无法实现，以最大最小进行计算误差较大.
+dadn_Manual, n_Manual, dk_Manual, a_Manual = \
+    experiment_calculation.FCGRandDKbyOriginalData(b=thickness, w=width, n=cycles, pmax=pmax, pmin=pmin, a=cracklength,
+                                                   ys=yield_strength, r=stress_ratio, threshold=0)
 
-dk_compliance = mts_analysis.DeltaKCalculating(b=thickness, w=width, a=cracklength, pmax=pmax, pmin=pmin)
-# Calculate delta K
-
-dadn_secant, cracklength_secant, cycles_secant, dk_secant = \
-    mts_analysis.FCGRateBySecant(a=cracklength, n=cycles, dk=dk_compliance)
-# Calculate FCG Rate by Secant, data selected at the same time, negative results are discarded.
-
-cycles_ligament_valid = \
-    mts_analysis.DataSelectByLigament(w=width, a=cracklength_secant, dk=dk_secant, ys=yield_strength, data=cycles_secant, r=stress_ratio)
-cracklength_ligament_valid = \
-    mts_analysis.DataSelectByLigament(w=width, a=cracklength_secant, dk=dk_secant, ys=yield_strength, data=cracklength_secant, r=stress_ratio)
-dadn_ligament_valid = \
-    mts_analysis.DataSelectByLigament(w=width, a=cracklength_secant, dk=dk_secant, ys=yield_strength, data=dadn_secant, r=stress_ratio)
-dk_ligament_valid = \
-    mts_analysis.DataSelectByLigament(w=width, a=cracklength_secant, dk=dk_secant, ys=yield_strength, data=dk_secant, r=stress_ratio)
-print("Ligament Vaild Check,", str(len(cycles_secant) - len(cycles_ligament_valid)), "records deleted.")
-# Check by Ligament Validation
-
-threshold = int(cycles.tail(1))
-cycles_threshold_valid = \
-    mts_analysis.DataSelectByThreshold(threshold=threshold, parameter=cycles_ligament_valid, data=cycles_ligament_valid)
-cracklength_threshold_valid = \
-    mts_analysis.DataSelectByThreshold(threshold=threshold, parameter=cycles_ligament_valid, data=cracklength_ligament_valid)
-dadn_threshold_valid = \
-    mts_analysis.DataSelectByThreshold(threshold=threshold, parameter=cycles_ligament_valid, data=dadn_ligament_valid)
-dk_threshold_valid = \
-    mts_analysis.DataSelectByThreshold(threshold=threshold, parameter=cycles_ligament_valid, data=dk_ligament_valid)
-print("Threshold Vaild Check,", str(len(cycles_ligament_valid) - len(cycles_threshold_valid)), "records deleted.")
-# Selected by Threshold，不做筛选（选择本身的最大值进行筛选，相当于不做筛选）
-
-c_Manual, m_Manual = mts_analysis.ParisFitting(dadn=dadn_threshold_valid, dk=dk_threshold_valid)
+c_Manual, m_Manual = mts_analysis.ParisFitting(dadn=dadn_Manual, dk=dk_Manual)
+dadn_paris_by_Manual = mts_analysis.ParisCalculating(c=c_Manual, m=m_Manual, dk=dk_Manual)
 print("Manual Restlt Fitting by Paris: c=", str(c_Manual), ",m=", str(m_Manual))
-dadn_paris_by_Manual = mts_analysis.ParisCalculating(c=c_Manual, m=m_Manual, dk=dk_threshold_valid)
 # Fitting Manual Result by Paris
+
 
 
 # Finding Information for Overload
@@ -106,37 +74,60 @@ print("Predicting Cycle when DeltaK =", str(dk_for_overload), "Mpa.m0.5:", str(c
 # Finding Cycles by CrackLength(by MTS Data)
 
 
+# Plotting
+# Plot: (1)Crack Length - Cycles (Original Data)
+plt.figure(num=1, figsize=(10, 8))
+plt.scatter(cycles, cracklength, s=1, label='$MTS$', color='red', lw=1)
+plt.xlabel("Cycles")
+plt.ylabel("Crack Length (mm)")
+plt.title('Crack Length - Cycles ' + sequence)
+plt.legend()
+plt.grid()
+if save:
+    plt.savefig('a-n_' + sequence + '_main_single.png', dpi=320)
+if show:
+    plt.show()
 
-# Ploting
-plot.CrackLength_Cycles(sequence=sequence,
-                        n_MTS=cycles,
-                        a_MTS=cracklength,
-                        save=save,
-                        show=show)
+# Plot: (2)da/dN - dk plot (MTS Result)
+plt.figure(num=2, figsize=(10, 8))
+plt.scatter(dk_MTS, dadn_MTS, s=1, label='$ExperimentData$', color='red', lw=1)
+plt.plot(dk_MTS, dadn_paris_by_MTS, label='$Fitting By Paris$', color='blue', linewidth=2)
+plt.axis([min(dk_MTS)*0.95, max(dk_MTS)*1.05, min(dadn_MTS)*0.95, max(dadn_MTS)*1.05])
+textplacex = (max(dk_MTS) - min(dk_MTS)) * 0.6 + min(dk_MTS)
+plt.text(textplacex, min(dadn_MTS), 'c=%.4e' % c_MTS+',m=%.4f' % m_MTS)
+plt.xlabel("DeltaK Applied (MPa*m^0.5)")
+plt.xscale('log')
+plt.ylabel("da/dN (mm/cycle)")
+plt.yscale('log')
+plt.yticks(np.linspace(min(dadn_MTS), max(dadn_MTS), 6))
+plt.xticks(np.linspace(min(dk_MTS), max(dk_MTS), 6))
+plt.title('da/dN - dK '+sequence+'(MTS Result)')
+plt.legend()
+plt.grid()
+if save:
+    plt.savefig('dadn-dk_MTS_'+sequence+'_main_single.png', dpi=320)
+if show:
+    plt.show()
 
-plot.CrackLengthError_Cycles(sequence=sequence,
-                             a_Manual=cracklength_compliance,
-                             a_MTS=cracklength,
-                             n=cycles,
-                             save=save,
-                             show=show)
 
-plot.FCGR_DeltaK_MTS(sequence=sequence,
-                     dk=dk_MTS,
-                     dadn=dadn_MTS,
-                     dadn_paris=dadn_paris_by_MTS,
-                     save=save,
-                     show=show)
-
-plot.FCGR_DeltaK_Comparation(sequence=sequence,
-                             dk_MTS=dk_MTS,
-                             dadn_MTS=dadn_MTS,
-                             dk_Manual=dk_threshold_valid,
-                             dadn_manual=dadn_threshold_valid,
-                             dadn_paris_MTS=dadn_paris_by_MTS,
-                             dadn_paris_Manual=dadn_paris_by_Manual,
-                             save=save,
-                             show=show)
-
-if show == 0:
-    plt.close()
+# Plot: da/dN - dk plot (MTS and Manual)
+plt.figure(num=3, figsize=(10, 8))
+plt.scatter(dk_MTS, dadn_MTS, s=1, label='$MTS Results$', color='red', lw=1)
+plt.scatter(dk_Manual, dadn_Manual, s=1, label='$Manual Results$', color='blue', lw=1)
+plt.plot(dk_MTS, dadn_paris_by_MTS, label='$MTS Results Fitting$', color='red', linewidth=2)
+plt.plot(dk_Manual, dadn_paris_by_Manual, label='$Manual Results Fitting$', color='blue', linewidth=2)
+plt.axis([min(dk_MTS)*0.95, max(dk_MTS)*1.05, min(dadn_MTS)*0.95, max(dadn_MTS)*1.05])
+plt.text(textplacex, min(dadn_MTS), 'MTS:c=%.4e' % c_MTS+',m=%.4f' % m_MTS+'\nManual:c=%.4e' % c_Manual+',m=%.4f' % m_Manual)
+plt.xlabel("DeltaK Applied (MPa*m^0.5)")
+plt.xscale('log')
+plt.ylabel("da/dN (mm/cycle)")
+plt.yscale('log')
+plt.yticks(np.linspace(min(dadn_MTS), max(dadn_MTS), 6))
+plt.xticks(np.linspace(min(dk_MTS), max(dk_MTS), 6))
+plt.title('da/dN - dK '+sequence+'(MTS compare with Manual)')
+plt.legend()
+plt.grid()
+if save:
+    plt.savefig('dadn-dk_MTS_and_Manual_'+sequence+'_main_single.png', dpi=320)
+if show:
+    plt.show()
