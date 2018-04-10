@@ -2,6 +2,7 @@
 
 import math
 import pandas as pd
+import numpy as np
 
 factor_for_k = 1e3 * math.sqrt(1e-3)  # convert kN.mm**-2 to Mpa.m**-0.5
 
@@ -84,3 +85,23 @@ def ReadTestInf(sequence):
     precrack_length = float(datatransfer(precrack_length))  # mm
 
     return specimen, width, notch_length, thickness, elastic_modulus, yield_strength, precrack_length
+
+
+def ReadCodData(sequence):
+    # usage: 读取COD和轴力的数据，文件名以Channels by Cycles结尾，包括指定循环内250组力与COD的数据
+    # input parameter:
+    # sequence: 试件Batch-specimen名
+    # return parameter:
+    # 循环次数数组、载荷数组、COD位移值数组
+    cycles = []
+    load = []       # kN
+    cod = []        # mm
+    for df in pd.read_csv(sequence + u"_Channels by Cycles.csv",
+                          chunksize=250):       # Read 250 records at one time
+        cycles.append(df["Nominal Cycle"])
+        load.append(df["Axial Force (kN)"])
+        cod.append(df["Axial COD (mm)"])
+    cycles = np.array(cycles).reshape(-1, 1)
+    load = np.array(load).reshape(-1, 1)
+    cod = np.array(cod).reshape(-1, 1)
+    return cycles, load, cod
