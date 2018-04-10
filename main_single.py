@@ -17,23 +17,22 @@
 # Load：N
 
 
-import read_data
-import mts_analysis
-import experiment_calculation
 import matplotlib.pyplot as plt
 import numpy as np
-
+from FCGAnalysisLib import experiment_calculation
+from FCGAnalysisLib import read_data
+from FCGAnalysisLib import mts_analysis
 
 # 分析和绘图参数
 show = 1
-save = 0
+save = 1
 way0 = 1                                   # 采用da dN, Delta K by Cycles.csv文件提供的结果计算
 way1 = 1                                   # 采用Crack Length,Min Max K, Load by Cycles.csv文件提供的结果计算
-way2 = 1                                   # 采用Channels by Cycles.csv文件提供的结果进行计算
-sequence = "yang-baoban_Lu-420-05"         # Graph Saving Sequence
+way2 = 0                                   # 采用Channels by Cycles.csv文件提供的结果进行计算
+sequence = "yang-baoban_Lu-420-08"         # Graph Saving Sequence
 cracklength_for_overload = 12              # For Finding Part, Find the cycles when length = 10mm
 dk_for_overload = 17                       # For Finding Part, Find the cycles when SIF = 30 MPa.m0.5
-stress_ratio = 0.1                         # Stress Ratio
+stress_ratio = 0.7                         # Stress Ratio
 threshold = 0                           # Threshold for paris region selecting
 
 
@@ -48,8 +47,8 @@ print('specimen name:', str(specimen))
 if way0:
     dadn_MTS, cycles_MTS, dk_MTS = read_data.ReadMtsResult(sequence=sequence)
     c_MTS, m_MTS = mts_analysis.ParisFitting(dadn=dadn_MTS, dk=dk_MTS)
-    c_MTS = 7.9713e-10  # Temp
-    m_MTS = 3.6797
+    c_MTS = 5.6665e-09
+    m_MTS = 3.0965
     dadn_paris_by_MTS = mts_analysis.ParisCalculating(c=c_MTS, m=m_MTS, dk=dk_MTS)
     print("MTS Results Fitting Result by Paris:c=", str(c_MTS), ",m=", str(m_MTS))
 
@@ -62,7 +61,7 @@ if way1:
     dadn_Manual, n_Manual, dk_Manual, a_Manual = \
         experiment_calculation.FCGRandDKbyOriginalData(b=thickness, w=width, n=cycles, pmax=pmax, pmin=pmin,
                                                        a=cracklength,
-                                                       ys=yield_strength, r=stress_ratio, threshold=0)
+                                                       ys=yield_strength, r=stress_ratio, threshold=threshold)
 
     c_Manual, m_Manual = mts_analysis.ParisFitting(dadn=dadn_Manual, dk=dk_Manual)
     dadn_paris_by_Manual = mts_analysis.ParisCalculating(c=c_Manual, m=m_Manual, dk=dk_Manual)
@@ -148,12 +147,12 @@ if way0:
     plt.plot(dk_MTS, dadn_paris_by_MTS, label='$MTS Results Fitting$', color='red', linewidth=2)
 if way1:
     plt.scatter(dk_Manual, dadn_Manual, s=1, label='$way1 Results$', color='green', lw=1)
-    plt.plot(dk_Manual, dadn_paris_by_Manual, label='$Way1 Results Fitting$', color='green', linewidth=2)
+    #plt.plot(dk_Manual, dadn_paris_by_Manual, label='$Way1 Results Fitting$', color='green', linewidth=2)
 if way2:
     plt.scatter(dk_way2, dadn_way2, s=1, label='$way2 Results$', color='blue', lw=1)
-    plt.plot(dk_way2, dadn_paris_by_way2, label='$way2 Results Fitting$', color='blue', linewidth=2)
+    #plt.plot(dk_way2, dadn_paris_by_way2, label='$way2 Results Fitting$', color='blue', linewidth=2)
 plt.axis([min(dk_MTS)*0.95, max(dk_MTS)*1.05, min(dadn_MTS)*0.95, max(dadn_MTS)*1.05])
-plt.text(textplacex, min(dadn_MTS), 'MTS:c=%.4e' % c_MTS+',m=%.4f' % m_MTS+'\nWay2:c=%.4e' % c_way2+',m=%.4f' % m_way2)
+#plt.text(textplacex, min(dadn_MTS), 'MTS:c=%.4e' % c_MTS+',m=%.4f' % m_MTS+'\nWay2:c=%.4e' % c_way2+',m=%.4f' % m_way2)
 plt.xlabel("DeltaK Applied (MPa*m^0.5)")
 plt.xscale('log')
 plt.ylabel("da/dN (mm/cycle)")
@@ -167,3 +166,5 @@ if save:
     plt.savefig('dadn-dk_MTS_and_Manual_'+sequence+'_main_single.png', dpi=320)
 if show:
     plt.show()
+
+

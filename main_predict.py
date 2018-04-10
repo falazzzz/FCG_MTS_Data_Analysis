@@ -6,28 +6,28 @@
 # (4)根据E647-11标准对韧带长度有效性要求确定有效的裂纹扩展长度
 
 
-import experiment_predict
-import numpy as np
-import mts_analysis
 import matplotlib.pyplot as plt
+from FCGAnalysisLib import mts_analysis
+import numpy as np
 
+from FCGAnalysisLib import experiment_predict
 
 # 估计参数
-c = 1.9421e-10       # Paris公式参数，单位 mm/cycles
-m = 4.2860           # Parsi公式参数，无量纲
-width = 40                  # CT试件尺寸Width，单位 mm
-thickness = 2.5             # CT试件尺寸厚度，单位 mm
+c = 6.7897e-10       # Paris公式参数，单位 mm/cycles
+m = 3.7295           # Parsi公式参数，无量纲
+width = 39.99                  # CT试件尺寸Width，单位 mm
+thickness = 2.54             # CT试件尺寸厚度，单位 mm
 start = 10                  # Precrack结束长度a0，单位 mm
-final = 20                  # 估算的最大裂纹长度，单位 mm
-load = [4000, 4500, 5000, 6000]         # 计算的载荷峰值，增加或删减需要对下方的主程序部分进行对应增减，单位 N
-stress_ratio = 0.7          # 应力比
-step = 1                    # 预估的裂纹扩展步长，单位 mm
+final = 30                  # 估算的最大裂纹长度，单位 mm
+load = [1200, 1600, 2000, 2400]         # 计算的载荷峰值，增加或删减需要对下方的主程序部分进行对应增减，单位 N
+stress_ratio = 0.1          # 应力比
+step = 0.25                    # 预估的裂纹扩展步长，单位 mm
 yield_strength = 0.446      # 材料的屈服强度，单位 Gpa
 
 
 # 绘图参数
-sequence = 'R=0.7_QSTE420TM'            # 保存文件名和绘图标题名
-save = 1            # 保存开关
+sequence = 'R=0.1_QSTE420TM'            # 保存文件名和绘图标题名
+save = 0            # 保存开关
 show = 1            # 显示开关
 
 
@@ -43,12 +43,13 @@ def predict(load):
     # dadn：估计的FCGR，mm/cycles
     # valid：有效性判断结果
     cracklength = np.arange(start, final+step, step)
-    dk_predict = experiment_predict.DeltaKPredict(w=width, thickness=thickness, start=start, final=final, load=load, r=stress_ratio, step=1)
+    dk_predict = experiment_predict.DeltaKPredict(w=width, thickness=thickness, start=start, final=final, load=load, r=stress_ratio, step=step)
     dadn = mts_analysis.ParisCalculating(c=c, m=m, dk=dk_predict)
     cycle = experiment_predict.CycleIntegrateBySimpson(c=c, m=m, dk=dk_predict, cracklength=cracklength)
     valid = []
     for seq, value in enumerate(cracklength):
-        valid.append(mts_analysis.LigamentValidCheck(w=width, a=value, dk=dk_predict[seq], ys=yield_strength, r=stress_ratio))
+        valid.append(
+            mts_analysis.LigamentValidCheck(w=width, a=value, dk=dk_predict[seq], ys=yield_strength, r=stress_ratio))
     return cracklength, dk_predict, dadn, cycle, valid
 
 

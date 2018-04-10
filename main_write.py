@@ -17,21 +17,20 @@
 # Load：N
 
 
-import read_data
-import mts_analysis
-import experiment_calculation
-import write_data
-
+from FCGAnalysisLib import experiment_calculation
+from FCGAnalysisLib import read_data
+from FCGAnalysisLib import mts_analysis
+from FCGAnalysisLib import write_data
 
 # 文件参数
-sequence = "yang-baoban_Lu-420-01"         # Graph Saving Sequence
-stress_ratio = 0.1                         # Stress Ratio
-threshold = 0                              # Threshold for paris region selecting
+sequence = "yang-baoban_Lu-420-03"         # Graph Saving Sequence
+stress_ratio = 0.7                         # Stress Ratio
+threshold = 15                              # Threshold for paris region selecting
 
 # 保存参数
 save = True                                # Save File or not
 dkstep = 1                                 # Recording Step for MTSResult
-astep = 0.5                                # Recording Step for ManualResult
+astep = 0.1                                # Recording Step for ManualResult
 
 # 实验基本参数读取
 specimen, width, notch_length, thickness, elastic_modulus, yield_strength, precrack_length = \
