@@ -1,5 +1,5 @@
 # 处理数据结果函数库
-# Last Update: 2018/4/10 Version 2.1.4
+# Last Update: 2018/4/11 Version 2.2.0
 # Lu Yunchao
 
 import numpy as np
@@ -372,6 +372,35 @@ def DataSelectByThreshold(threshold, parameter, data, keepbigger=1):
         elif value >= threshold:
             newdata.append(data[seq])
     return newdata
+
+
+def FCGDataSelectByThreshold(dadn, dk, n, a, threshold, target='dk', keepbigger=1):
+    # usage: 一组筛选FCG的四个主要参数dadn、dk、n和a，保留阈值以上/下的值
+    # input parameter:
+    # dadn, dk, n, a: 筛选前四个主要参数的原始数据
+    # threshold: 筛选的阈值
+    # target：筛选的参数，可选:'dk', 'a', 'n'
+    # keepbigger：1：保留大于阈值的部分，0：保留小于阈值的部分
+    # return parameter:
+    # dadn_new, dk_new, n_new, a_new：筛选保留下的新数据
+    if target == 'dk':
+        parameter = dk
+    elif target == 'a':
+        parameter = a
+    elif target == 'n':
+        parameter = n
+    else:
+        print('Error parameter: target, set dk as default.')
+        parameter = 'dk'
+    dadn_new = DataSelectByThreshold(threshold=threshold, parameter=parameter,
+                                                  data=dadn, keepbigger=keepbigger)
+    dk_new = DataSelectByThreshold(threshold=threshold, parameter=parameter,
+                                                data=dk, keepbigger=keepbigger)
+    n_new = DataSelectByThreshold(threshold=threshold, parameter=parameter,
+                                               data=n, keepbigger=keepbigger)
+    a_new = DataSelectByThreshold(threshold=threshold, parameter=parameter,
+                                               data=a, keepbigger=keepbigger)
+    return dadn_new, dk_new, n_new, a_new
 
 
 def FindAscentDataBySeq(value, item, target):
