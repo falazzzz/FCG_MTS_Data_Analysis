@@ -65,12 +65,18 @@ dadn_walker = []
 dk_walker, r_walker = np.mgrid[10:41:1, 0.1:0.8:0.1]
 dadn_walker = mts_analysis.WalkerCalculating(c0=c0b, m0=m0b, gamma=gammab, dk=dk_walker, r=r_walker)
 # Walker模型计算平面
+
 dk_walker_r01 = np.arange(np.min(dk_r01), np.max(dk_r01), 1)
 dadn_walker_r01 = mts_analysis.WalkerCalculating(c0=c0b, m0=m0b, gamma=gammab, dk=dk_walker_r01, r=0.1)
 dk_walker_r07 = np.arange(np.min(dk_r07), np.max(dk_r07), 1)
 dadn_walker_r07 = mts_analysis.WalkerCalculating(c0=c0b, m0=m0b, gamma=gammab, dk=dk_walker_r07, r=0.7)
 # 用Walker模型分别拟合R=0.1和R=0.7的情况
 
+dk_eq_r01 = dk_r01*(1 - 0.1)**(gammab - 1)
+dk_eq_r07 = dk_r07*(1 - 0.7)**(gammab - 1)
+dk_walker_eq = np.arange(min(dk_eq_r07), max(dk_eq_r01), 1)
+dadn_walker_eq = c0b*dk_walker_eq**m0b
+# 用Walker模型的等效SIF表示结果
 
 
 # Plotting: (1)da/dN - dk - r 3D plot
@@ -87,7 +93,7 @@ ax.set_zlabel("log(da/dN)/mm per cycle")
 if show:
     plt.show()
 
-# Plotting: (2)dadN - dk 2D plot
+# Plotting: (2)dadN - dk 2D plot in dk
 plt.figure(num=1, figsize=(10, 8))
 plt.scatter(dk_r01, dadn_r01, lw=1, marker='+', label='R=0.1')
 plt.scatter(dk_r07, dadn_r07, lw=1, marker='*', label='R=0.7')
@@ -96,13 +102,32 @@ plt.plot(dk_walker_r07, dadn_walker_r07, label='WalkerFit R=0.7', color='red', l
 plt.axis([min(dk_r07), max(dk_r01), min(dadn_r07), max(dadn_r01)*1.2])
 plt.yticks(np.linspace(min(dadn_r07)*0.9, max(dadn_r01), 6))
 plt.xticks(np.linspace(min(dk_r07), max(dk_r01), 6))
-plt.title("FCG Rates - Delta SIF")
+plt.title("FCG Rates - Delta SIF(Real)")
 plt.ylabel("FCG Rates/ mm per cycle")
 plt.xlabel("DeltaK/ MPa.m0.5")
 plt.xscale('log')
 plt.yscale('log')
 plt.legend()
-plt.grid(which='minor',linestyle='--')
-plt.grid(which='major',linestyle='--')
+plt.grid(which='minor', linestyle='--')
+plt.grid(which='major', linestyle='--')
+if show:
+    plt.show()
+
+# Plotting: (2)dadN - dk 2D plot
+plt.figure(num=3, figsize=(10, 8))
+plt.scatter(dk_eq_r01, dadn_r01, lw=1, marker='+', label='R=0.1')
+plt.scatter(dk_eq_r07, dadn_r07, lw=1, marker='*', label='R=0.7')
+plt.plot(dk_walker_eq, dadn_walker_eq, label='WalkerFit', color='black', linewidth=2)
+plt.axis([min(dk_eq_r07), max(dk_eq_r01), min(dadn_r07), max(dadn_r01)*1.2])
+plt.yticks(np.linspace(min(dadn_r07)*0.9, max(dadn_r01), 6))
+plt.xticks(np.linspace(min(dk_eq_r07), max(dk_eq_r01), 6))
+plt.title("FCG Rates - Delta SIF(Equivalent)")
+plt.ylabel("FCG Rates/ mm per cycle")
+plt.xlabel("DeltaKeq/ MPa.m0.5")
+plt.xscale('log')
+plt.yscale('log')
+plt.legend()
+plt.grid(which='minor', linestyle='--')
+plt.grid(which='major', linestyle='--')
 if show:
     plt.show()
