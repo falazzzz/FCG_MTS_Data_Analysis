@@ -221,7 +221,7 @@ def Compliance(e, b, w, p, v):
 
 
 def DeltaKCalculating(b, w, a, pmax, pmin):
-    # usage: 依据E647-11标准计算CT试件的SIF变幅，适用范围a/W >= 0.2
+    # usage: 依据E647-11标准计算CT试件的SIF变幅，适用范围a/W >= 0.2且韧带长度有效
     # input parameter:
     # b: 试件厚度thickness，单位 mm
     # w: 试件宽度Width，单位 mm
@@ -243,6 +243,31 @@ def DeltaKCalculating(b, w, a, pmax, pmin):
     m3 = kc0 + kc1 * alpha + kc2 * alpha ** 2 + kc3 * alpha ** 3 + kc4 * alpha ** 4
     deltaK = m1 * m2 * m3 * factor_for_k
     return deltaK
+
+
+def DeltaKCalculatingByMurakami(b, w, a, pmax, pmin):
+    # usage: 依据Murakami在1987年给出的公式计算CT试件的SIF变幅，适用范围a/W >= 0.2且韧带长度有效
+    # input parameter:
+    # b: 试件厚度thickness，单位 mm
+    # w: 试件宽度Width，单位 mm
+    # a：对应裂纹长度，单位 mm
+    # pmax：对应载荷最大值，单位 N
+    # pmin：对应载荷最小值，单位 N
+    # return parameter:
+    # deltaK：SIF变幅，单位 MPa.m0.5
+    alphas = a/w
+    p = pmax - pmin
+    s1 = 16.7
+    s2 = -104.7
+    s3 = 369.9
+    s4 = -573.8
+    s5 = 360.5
+    k1 = []
+    for seq, alpha in enumerate(alphas):
+        k1l = (p[seq]/b)*math.sqrt(math.pi/w)
+        k1r = (s1*alpha**0.5 + s2*alpha**1.5 + s3*alpha**2.5 + s4*alpha**3.5 + s5*alpha**4.5)
+        k1.append(k1l * k1r / math.sqrt(1e3))
+    return np.array(k1)
 
 
 def FCGRateBySecant(a, n, dk, select=True):
@@ -400,7 +425,7 @@ def FCGDataSelectByThreshold(dadn, dk, n, a, threshold, target='dk', keepbigger=
                                                data=n, keepbigger=keepbigger)
     a_new = DataSelectByThreshold(threshold=threshold, parameter=parameter,
                                                data=a, keepbigger=keepbigger)
-    return dadn_new, dk_new, n_new, a_new
+    return np.array(dadn_new), np.array(dk_new), np.array(n_new), np.array(a_new)
 
 
 def FindAscentDataBySeq(value, item, target):

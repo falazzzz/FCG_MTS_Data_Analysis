@@ -1,5 +1,5 @@
 # read_data部分，负责读取文件并整理格式，返回数组
-# Last Update: 2018/4/10 Version 2.2.0
+# Last Update: 2018/4/13 Version 2.2.2
 # Lu Yunchao
 
 import math
@@ -12,36 +12,49 @@ inputfile = "\\inputfile\\"             # 读取文件放置的子文件夹名
 path = sys.path[0] + inputfile  # 设定读取的绝对路径
 
 
-def ReadMtsResult(sequence, dataselect=1):
+def ReadMtsResult(sequence, dataselect=1, dkeffread=0):
     # usage: 读取MTS输出的拟合计算结果，共有裂纹扩展速率da/dN，循环数cycles，SIF变幅dk三项
     # 若dataselect=1，则会根据数据Validity一栏对结果的有效性进行筛选，删去扩展速率为负的结果
     # input parameter:
     # sequence: 文件名前缀，通常由batch名和specimen名组成
     # dataselect: 是否根据文件内的标签对数据的有效性进行筛选
+    # dkeffread :是否读取等效SIF变幅数据，默认不读取
     # return parameter:
-    # 裂纹扩展速率dadn，循环数cycles，SIF变幅dk
+    # 裂纹扩展速率dadn，循环数cycles，SIF变幅dk，等效SIF变幅dkeff
     mtsresult = pd.read_csv(path + sequence + u"_da dN, Delta K by Cycles.csv")  # Data File Reading
     dadn = mtsresult["da/dN (mm/cycle)"]
     cycles = mtsresult["Cycles"]
     dk = mtsresult["Delta K Applied (kN/mm^1.5)"] * factor_for_k
+    dkeff = mtsresult["Delta K Effective (kN/mm^1.5)"] * factor_for_k
     if dataselect:
         dadn_s = []
         cycles_s = []
         dk_s = []
+        if dkeffread == 1:
+            dkeff_s = []
         validity = mtsresult["Validity"]
         for seq, value in enumerate(validity):
             if value == "Valid":
                 dadn_s.append(dadn[seq])
                 cycles_s.append(cycles[seq])
                 dk_s.append(dk[seq])
+                if dkeffread == 1:
+                    dkeff_s.append(dkeff[seq])
         dadn_s = np.array(dadn_s)
         cycles_s = np.array(cycles_s)
         dk_s = np.array(dk_s)
+        if dkeffread == 1:
+            dkeff_s = np.array(dkeff_s)
     else:
         dadn_s = dadn
         cycles_s = cycles
         dk_s = dk
-    return dadn_s, cycles_s, dk_s
+        if dkeffread == 1:
+            dkeff_s = dkeff
+    if dkeffread == 1:
+        return dadn_s, cycles_s, dk_s, dkeff_s
+    else:
+        return dadn_s, cycles_s, dk_s
 
 
 def ReadOriginResult(sequence, closure=False, cod=True):
