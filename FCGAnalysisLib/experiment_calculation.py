@@ -1,5 +1,6 @@
 # 实验结果原始值计算函数
 from FCGAnalysisLib import mts_analysis
+from FCGAnalysisLib import tensiontest_analysis
 import numpy as np
 
 
@@ -45,3 +46,24 @@ def FCGRandDKbyOriginalData(b, w, a, n, pmax, pmin, ys, r, kclosure=[], threshol
     else:
         return np.array(dadn_valid), np.array(n_valid), np.array(dk_valid), np.array(a_valid), np.array(kc_valid)
 
+
+def RambergOsgoodFitFromOriginal(s, e, ys, E, uplimit=1, lowlimit=0):
+    # usage: 根据简单拉伸实验的应力应变数据拟合弹塑性的Ramberg-Osgood模型
+    # imput parameter:
+    # s,e: 工程应力和应变，应力单位MPa，e单位为1
+    # ys,E: 材料参数，屈服强度和弹性模量，单位GPa
+    # uplimit,lowlimit: 拟合过程中发现将弹性部分的数据纳入拟合会导致曲线上翘明显，通过选取拟合数据的上下限
+    # uplimit和lowlimit筛选出塑性变形段（不包括颈缩段），可优化拟合效果，默认为[0,1]
+    # return parameter：
+    # Ramberg-Osgood拟合结果n和alpha
+    truestress = tensiontest_analysis.TrueStress(engineeringstress=s, engineeringstrain=e)
+    truestrain = tensiontest_analysis.TrueStrain(engineeringstrain=e)
+    te_selected0 = mts_analysis.DataSelectByThreshold(threshold=lowlimit, parameter=truestrain, data=truestrain)
+    ts_selected0 = mts_analysis.DataSelectByThreshold(threshold=lowlimit, parameter=truestrain, data=truestress)
+    te_selected = mts_analysis.DataSelectByThreshold(threshold=uplimit, parameter=te_selected0, data=te_selected0,
+                                                     keepbigger=0)
+    ts_selected = mts_analysis.DataSelectByThreshold(threshold=uplimit, parameter=te_selected0, data=ts_selected0,
+                                                     keepbigger=0)
+    n, alpha = tensiontest_analysis.RambergOsgoodFitting(s=ts_selected, e=te_selected, ys=ys, E=E)
+    print("Osgood Fitting Result:n=", str(n), ",alpha=", str(alpha))
+    return n, alpha

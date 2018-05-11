@@ -77,7 +77,7 @@ def ReadOriginResult(sequence, closure=False, cod=True):
     pmin = mtsdata["Minimum Axial Force (kN)"] * 1e3  # N
     if closure:
         kclosure = mtsdata["K Closure (kN/mm^1.5)"] * factor_for_k  # MPa.m^0.5
-        closureload = mtsdata["Closure Load (kN/mm^1.5)"] * factor_for_k    # MPa.m^0.5
+        closureload = mtsdata["Closure Load (kN/mm^1.5)"]    # kN, 推测MTS软件输出显示的单位有误
     if cod:
         codmax = mtsdata["Maximum Axial COD (mm)"]  # mm
         codmin = mtsdata["Minimum Axial COD (mm)"]  # mm
@@ -153,7 +153,7 @@ def ReadTensionResult(sequence):
     # load：载荷/N
     # stress：工程应力/MPa
     # strain：工程应变/MPa
-    tensionresult = pd.read_csv(u"QSTE420TM_TensionTest_" + sequence + u".csv")  # Data File Reading
+    tensionresult = pd.read_csv(path + u"QSTE420TM_TensionTest_" + sequence + u".csv")  # Data File Reading
     extension = tensionresult["Extension (mm)"]
     load = tensionresult["Load (N)"]
     stress = tensionresult["Stress (MPa)"]

@@ -22,6 +22,20 @@ def PlasticZoneWithFactor(kmax, ys, factor):
     return np.array(r)
 
 
+def FactorXiaoping(kmax, t, ys):
+    # usage: 计算Xiaoping提出的塑性区尺寸
+    # input parameter:
+    # kmax：应力强度因子幅值，单位MPa.m0.5
+    # t：厚度，单位mm
+    # ys：屈服强度，单位GPa
+    # return parameter:
+    # factor: 塑性区尺寸计算结果
+    t = t*1e-3
+    ys = ys*1e3
+    factor = 0.35 - 0.29/(1 + (1.08*kmax**2/(t*ys**2))**2.15)
+    return factor
+
+
 def WheelerFittingBaseParis(a, dadn, dk, rm, aol, rol, c, m):
     # usage: 由高载为起始点的数据，以Paris公式为基础裂纹扩展速率模型进行Wheeler模型拟合
     # NOTE：数据的起始点必须是高载后！
