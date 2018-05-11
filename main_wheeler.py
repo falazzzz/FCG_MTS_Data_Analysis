@@ -1,3 +1,5 @@
+# 采用Salvati提出的带延迟的Wheeler模型计算
+
 import math
 import matplotlib.pyplot as plt
 import numpy as np
@@ -7,21 +9,26 @@ from FCGAnalysisLib import experiment_calculation
 from FCGAnalysisLib import overload_analysis
 
 
-sequence = ["yang-baoban_Lu-420-06"]
+sequence = ["yang-baoban_Lu-420-09"]
 save = 0
-stress_ratio = 0.1
+stress_ratio = 0.7
 threshold = 0
+pol = 8000
+ppeak = 4000
+
 if stress_ratio == 0.1:
     c_ca = 7.9713e-10
     m_ca = 3.6797
 elif stress_ratio == 0.7:
     c_ca = 5.6665e-09
     m_ca = 3.0965
-aol = 12.3495   # 高载时dadN最低值对应的裂纹长度
-apre = 11.9671  # 高载时dadN最高值对应的裂纹长度
-ad = 12.4516 - apre  # retardation delay长度
-pol = 4000
-ppeak = 2000
+
+a_ol = 13.00
+a_ol_applied = 12.10
+a_fcgr_min = 13.00   # 高载时dadN最低值对应的裂纹长度
+a_fcgr_max = 12.10  # 高载时dadN最高值对应的裂纹长度
+ad = a_fcgr_min - a_fcgr_max  # retardation delay长度
+
 # 参数设置
 
 specimen, width, notch_length, thickness, elastic_modulus, yield_strength, precrack_length = \
@@ -33,81 +40,57 @@ dadn_Manual, n_Manual, dk_Manual, a_Manual = \
                                                    ys=yield_strength, r=stress_ratio, threshold=threshold)
 # 实验数据读取和初步处理
 
-kol = mts_analysis.DeltaKCalculating(b=thickness, w=width, a=aol, pmax=pol, pmin=0)
+kol = mts_analysis.DeltaKCalculating(b=thickness, w=width, a=a_ol, pmax=pol, pmin=0)
 rol = overload_analysis.PlasticZoneWithFactor(kmax=np.array([kol]), ys=yield_strength, factor=1/math.pi)
 # 高载参数计算
 
 dadn_ola, dk_ola, n_ola, a_ola = \
     mts_analysis.FCGDataSelectByThreshold(dadn=dadn_Manual, dk=dk_Manual, n=n_Manual, a=a_Manual,
-                                          threshold=aol, target='a', keepbigger=1)
+                                          threshold=a_fcgr_min, target='a', keepbigger=1)
 # 以高载时裂纹长度aol筛选出高载后的数据
 
 kmax_ola = np.array([dk/(1-stress_ratio) for dk in dk_ola])
 rm_ola = overload_analysis.PlasticZoneWithFactor(kmax=kmax_ola, ys=yield_strength, factor=1/math.pi)
 # 高载段参数计算
 
-m1, _ = overload_analysis.WheelerFittingBaseParis(a=a_ola, dadn=dadn_ola, dk=dk_ola, rm=rm_ola, aol=aol, rol=rol, c=c_ca, m=m_ca)
+m1, _ = overload_analysis.WheelerFittingBaseParis(a=a_ola, dadn=dadn_ola, dk=dk_ola, rm=rm_ola, aol=a_ol, rol=rol,
+                                                  c=c_ca, m=m_ca)
 # Wheeler模型指数系数m1拟合
 
 dadn_wheeler, dk_wheeler, a_wheeler, cp_wheeler = \
-    overload_analysis.WheelerCalculatingBaseParis(astart=apre, afinal=max(a_Manual),
+    overload_analysis.WheelerCalculatingBaseParis(astart=a_fcgr_max, afinal=max(a_Manual),
                                                   b=thickness, w=width, ys=yield_strength, pmax=ppeak, r=stress_ratio,
-                                                  aol=aol, rol=rol, plasticzonefactor=1/math.pi,
+                                                  aol=a_ol, rol=rol, plasticzonefactor=1/math.pi,
                                                   m1=m1, c=c_ca, m=m_ca)
-# Wheeler模型计算
-'''
-# 采用Mehrzadi, 2013提出的延迟系数计算
-kd = mts_analysis.DeltaKCalculating(b=thickness, w=width, a=aol + ad, pmax=ppeak, pmin=ppeak*stress_ratio)
-alpha_d = ad*1e-3 / ((kol/yield_strength*1e-3)**2 - (kd/yield_strength*1e-3)**2)
-rd_ol = overload_analysis.PlasticZoneWithFactor(kmax=[kol], ys=yield_strength, factor=alpha_d)
-rd_i =overload_analysis.PlasticZoneWithFactor(kmax=dk_ola/(1-stress_ratio), ys=yield_strength, factor=alpha_d)
-cpmin = np.min(cp_wheeler)
-left = a_ola + rd_i
-right = aol + rd_ol
-if left[-1] < right:
-    dadn_old = dadn_ola
-    dk_old = dk_ola
-    a_old = a_ola
-    rm_old = rm_ola
-    print("Delay Region Check: Fitting Region:dk_start=" + str(dk_old[0]) + ",to the END.")
-elif left[0] >= right:
-    print("No Delay Region, Check Input Parameter!")
-else:
-    for seq, _ in enumerate(left):
-        if left[seq] >= right:
-            dadn_old = dadn_ola[0:seq]
-            dk_old = dk_ola[0:seq]
-            a_old = a_ola[0:seq]
-            rm_old = rm_ola[0:seq]
-            print("Delay Region Check: Fitting Region:dk_start=" + str(dk_old[0]) + ",dk_final=" + str(dk_old[-1]))
-            break
-cd_wheeler = np.exp((a_old - aol)/ad * np.log(cpmin))
-cd_wheeler = np.concatenate((cd_wheeler, np.full(len(cp_wheeler)-len(cd_wheeler), 1)))
-# 延迟系数D的计算
+# 原始Wheeler模型计算
 
-c_wheeler = cd_wheeler*cp_wheeler
-dadn_wheelermodified = c_wheeler * (c_ca * dk_wheeler**m_ca)
-# 用带延迟系数D的模型计算dadn
-'''
-# 采用Salvati, 2016提出的延迟系数计算
 dadn_old, dk_old, n_old, a_old = \
     mts_analysis.FCGDataSelectByThreshold(dadn=dadn_Manual, dk=dk_Manual, n=n_Manual, a=a_Manual,
-                                          threshold=apre, target='a', keepbigger=1)
-kd = mts_analysis.DeltaKCalculating(b=thickness, w=width, a=apre+ad, pmax=ppeak, pmin=ppeak*stress_ratio)
+                                          threshold=a_fcgr_max, target='a', keepbigger=1)
+# 筛选出自dadN最高点往后的数据
+
+kd = mts_analysis.DeltaKCalculating(b=thickness, w=width, a=a_fcgr_max+ad, pmax=ppeak, pmin=ppeak*stress_ratio)
+# 计算延迟结束位置（即dadN最低值对应的裂纹长度）对应的SIF
+
 alpha_d = ad*1e-3 / ((kol/yield_strength*1e-3)**2 - (kd/yield_strength*1e-3)**2)
 rd_ol = overload_analysis.PlasticZoneWithFactor(kmax=[kol], ys=yield_strength, factor=alpha_d)
 rd_i = overload_analysis.PlasticZoneWithFactor(kmax=dk_old/(1-stress_ratio), ys=yield_strength, factor=alpha_d)
+# 以alhpa_d为系数的延迟区域尺寸计算
+
 cp_old = overload_analysis.CpCalculatingBaseParis(a=a_old, b=thickness, w=width, ys=yield_strength, pmax=ppeak,
-                                                  r=stress_ratio, aol=aol, rol=rol, plasticzonefactor=1/math.pi, m1=m1)
+                                                  r=stress_ratio, aol=a_ol, rol=rol, plasticzonefactor=1/math.pi, m1=m1)
+# 按照已拟合得到的Wheeler模型计算实验点对应的Retardation Parameter
+
 m_mod, _ = overload_analysis.DelayFittingBaseParis(a=a_old, dadn=dadn_old, dk=dk_old, cp=cp_old,
-                                                   rd=rd_i, aol=apre, rdol=rd_ol, c=c_ca, m=m_ca)
+                                                   rd=rd_i, aol=a_ol_applied, rdol=rd_ol, c=c_ca, m=m_ca)
+# 拟合延迟系数m_mod
 
 dadn_salvati, dk_salvati, a_salvati, cd_salvati, cp_salvati = \
-    overload_analysis.SalvatiWheelerCalculatingBaseParis(astart=apre, afinal=max(a_Manual),
+    overload_analysis.SalvatiWheelerCalculatingBaseParis(astart=a_fcgr_max, afinal=max(a_Manual),
                                                          b=thickness, w=width, ys=yield_strength,
-                                                         pmax=ppeak, r=stress_ratio, aol=aol, rol=rol,
+                                                         pmax=ppeak, r=stress_ratio, aol=a_ol, rol=rol,
                                                          plasticzonefactor=1/math.pi, m1=m1, c=c_ca, m=m_ca,
-                                                         apre=apre, rdol=rd_ol, delayfactor=alpha_d, m_mod=m_mod)
+                                                         apre=a_ol_applied, rdol=rd_ol, delayfactor=alpha_d, m_mod=m_mod)
 # Salvati修正的Wheeler模型拟合
 
 # Plotting

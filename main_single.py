@@ -29,9 +29,9 @@ save = 1
 way0 = 1                                   # 采用da dN, Delta K by Cycles.csv文件提供的结果计算
 way1 = 1                                   # 采用Crack Length,Min Max K, Load by Cycles.csv文件提供的结果计算
 way2 = 0                                   # 采用Channels by Cycles.csv文件提供的结果进行计算
-sequence = "yang-baoban_Lu-420-08"         # Graph Saving Sequence
+sequence = "yang-baoban_Lu-420-17"         # Graph Saving Sequence
 cracklength_for_overload = 12              # For Finding Part, Find the cycles when length = 10mm
-dk_for_overload = 17                       # For Finding Part, Find the cycles when SIF = 30 MPa.m0.5
+dk_for_overload = 10                      # For Finding Part, Find the cycles when SIF = 30 MPa.m0.5
 stress_ratio = 0.7                         # Stress Ratio
 threshold = 0                           # Threshold for paris region selecting
 
@@ -47,8 +47,8 @@ print('specimen name:', str(specimen))
 if way0:
     dadn_MTS, cycles_MTS, dk_MTS = read_data.ReadMtsResult(sequence=sequence)
     c_MTS, m_MTS = mts_analysis.ParisFitting(dadn=dadn_MTS, dk=dk_MTS)
-    c_MTS = 5.6665e-09
-    m_MTS = 3.0965
+    c_MTS = 5.8363e-09
+    m_MTS = 3.0876
     dadn_paris_by_MTS = mts_analysis.ParisCalculating(c=c_MTS, m=m_MTS, dk=dk_MTS)
     print("MTS Results Fitting Result by Paris:c=", str(c_MTS), ",m=", str(m_MTS))
 
@@ -103,7 +103,7 @@ print("Predicting Cycle when DeltaK =", str(dk_for_overload), "Mpa.m0.5:", str(c
 # Plot: (1)Crack Length - Cycles (Way1, 2)
 plt.figure(num=1, figsize=(10, 8))
 if way1:
-    plt.scatter(n_Manual, a_Manual, s=1, label='$Way1$', color='green', lw=1)
+    plt.scatter(n_Manual, a_Manual, label='$Way1$', color='green', marker='+')
 if way2:
     plt.scatter(n_way2, a_way2, s=1, label='$Way2$', color='blue', lw=1)
 plt.xlabel("Cycles")
@@ -119,7 +119,7 @@ if show:
 # Plot: (2)da/dN - dk plot (Only Way0)
 if way0:
     plt.figure(num=2, figsize=(10, 8))
-    plt.scatter(dk_MTS, dadn_MTS, s=1, label='$ExperimentData$', color='red', lw=1)
+    plt.scatter(dk_MTS, dadn_MTS, label='$ExperimentData$', color='red', marker='+')
     plt.plot(dk_MTS, dadn_paris_by_MTS, label='$Fitting By Paris$', color='blue', linewidth=2)
     plt.axis([min(dk_MTS) * 0.95, max(dk_MTS) * 1.05, min(dadn_MTS) * 0.95, max(dadn_MTS) * 1.05])
     textplacex = (max(dk_MTS) - min(dk_MTS)) * 0.6 + min(dk_MTS)
@@ -128,7 +128,7 @@ if way0:
     plt.xscale('log')
     plt.ylabel("da/dN (mm/cycle)")
     plt.yscale('log')
-    plt.yticks(np.linspace(min(dadn_MTS), max(dadn_MTS), 6))
+    #plt.yticks(np.linspace(min(dadn_MTS), max(dadn_MTS), 6))
     plt.xticks(np.linspace(min(dk_MTS), max(dk_MTS), 6))
     plt.title('da/dN - dK ' + sequence + '(MTS Result)')
     plt.legend()
@@ -157,7 +157,7 @@ plt.xlabel("DeltaK Applied (MPa*m^0.5)")
 plt.xscale('log')
 plt.ylabel("da/dN (mm/cycle)")
 plt.yscale('log')
-plt.yticks(np.linspace(min(dadn_MTS), max(dadn_MTS), 6))
+#plt.yticks(np.linspace(min(dadn_MTS), max(dadn_MTS), 6))
 plt.xticks(np.linspace(min(dk_MTS), max(dk_MTS), 6))
 plt.title('da/dN - dK '+sequence+'(MTS compare with Manual)')
 plt.legend()

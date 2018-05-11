@@ -16,8 +16,8 @@ import numpy as np
 #Switch
 show = 1
 save = 0
-sequence = ["yang-baoban_Lu-420-01", "yang-baoban_Lu-420-02"]         # Graph Saving Sequence
-stress_ratio = 0.1     # Stress Ratio
+sequence = ["yang-baoban_Lu-420-11", "yang-baoban_Lu-420-13"]         # Graph Saving Sequence
+stress_ratio = 0.5     # Stress Ratio
 threshold = [0, 0]
 print('Specimens:', sequence)
 # Specimen1
@@ -70,15 +70,15 @@ name = 'R=' + str(stress_ratio) + '_QSTE420TM'
 textplacex = (max(dk_paris_sorted_manual) - min(dk_paris_sorted_manual)) * 0.5 + min(dk_paris_sorted_manual)
 # Plotting: (1)da/dN - dk(Manual) plot(2次实验结果对比)
 plt.figure(num=1, figsize=(7, 5))
-plt.scatter(dk_Manual1, dadn_Manual1, s=1, label='$Pmax=5.0kN$', color='red', lw=1)
-plt.scatter(dk_Manual2, dadn_Manual2, s=1, label='$Pmax=4.0kN$', color='blue', lw=1)
+plt.scatter(dk_Manual1, dadn_Manual1, s=1, label='$Pmax=3.6kN$', color='red', lw=1)
+plt.scatter(dk_Manual2, dadn_Manual2, s=1, label='$Pmax=2.8kN$', color='blue', lw=1)
 plt.plot(dk_paris_sorted_manual, dadn_paris_manual, label='$Fitting By Paris$', color='black', linewidth=2)
 plt.axis([min(dk_paris_sorted_manual)*0.95, max(dk_paris_sorted_manual)*1.05,
           min(dadn_paris_manual)*0.95, max(dadn_paris_manual)*1.05])
-plt.text(textplacex, min(dadn_Manual), 'Manual:c=%.4e' % c_Manual+',m=%.4f' % m_Manual)
+#plt.text(textplacex, min(dadn_Manual), 'Manual:c=%.4e' % c_Manual+',m=%.4f' % m_Manual)
 plt.xlabel("DeltaK Applied (MPa*m^0.5)")
 plt.xscale('log')
-plt.xticks(np.linspace(min(dk_paris_sorted_manual), max(dk_paris_sorted_manual), 4))
+plt.xticks(np.linspace(min(dk_paris_sorted_manual), max(dk_paris_sorted_manual), 5))
 plt.ylabel("da/dN (mm/cycle)")
 plt.yscale('log')
 plt.title('da/dN - dK ' + name + '(Manual Result)')
@@ -92,18 +92,20 @@ if show:
 # Plotting: (2)da/dN - dk(MTS) plot(2次实验结果对比)
 textplacex = (max(dk_paris_sorted_MTS) - min(dk_paris_sorted_MTS)) * 0.5 + min(dk_paris_sorted_MTS)
 plt.figure(num=2, figsize=(7, 5))
-plt.scatter(dk_MTS1, dadn_MTS1, s=1, label='$Pmax=5.0kN$', color='red', lw=1)
-plt.scatter(dk_MTS2, dadn_MTS2, s=1, label='$Pmax=4.0kN$', color='blue', lw=1)
+plt.scatter(dk_MTS1, dadn_MTS1, s=1, label='$Pmax=3.6kN$', color='red', lw=1)
+plt.scatter(dk_MTS2, dadn_MTS2, s=1, label='$Pmax=2.8kN$', color='blue', lw=1)
 plt.plot(dk_paris_sorted_MTS, dadn_paris_MTS, label='$Fitting By Paris$', color='black', linewidth=2)
 plt.axis([min(dk_paris_sorted_MTS)*0.95, max(dk_paris_sorted_MTS)*1.05,
           min(dadn_paris_MTS)*0.95, max(dadn_paris_MTS)*1.05])
-plt.text(textplacex, min(dadn_MTS), 'MTS:c=%.4e' % c_MTS+',m=%.4f' % m_MTS)
+#plt.text(textplacex, min(dadn_MTS), 'MTS:c=%.4e' % c_MTS+',m=%.4f' % m_MTS)
 plt.xlabel("DeltaK Applied (MPa*m^0.5)")
 plt.xscale('log')
 plt.ylabel("da/dN (mm/cycle)")
 plt.yscale('log')
-plt.xticks(np.linspace(min(dk_paris_sorted_MTS), max(dk_paris_sorted_MTS), 4))
+#plt.xticks(np.linspace(min(dk_paris_sorted_MTS), max(dk_paris_sorted_MTS), 6))
 plt.title('da/dN - dK ' + name + '(MTS Result)')
+plt.grid(which='minor', linestyle='--')
+plt.grid(which='major', linestyle='--')
 plt.legend()
 plt.grid()
 if save:

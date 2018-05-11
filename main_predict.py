@@ -13,20 +13,21 @@ import numpy as np
 from FCGAnalysisLib import experiment_predict
 
 # 估计参数
-c = 6.7897e-10       # Paris公式参数，单位 mm/cycles
-m = 3.7295           # Parsi公式参数，无量纲
+c = 8.0448e-10       # Walker模型参数，单位 mm/cycles
+m = 3.6655           # Walker模型参数，无量纲
+gamma = 0.9055
 width = 39.99                  # CT试件尺寸Width，单位 mm
 thickness = 2.54             # CT试件尺寸厚度，单位 mm
 start = 10                  # Precrack结束长度a0，单位 mm
-final = 30                  # 估算的最大裂纹长度，单位 mm
-load = [1200, 1600, 2000, 2400]         # 计算的载荷峰值，增加或删减需要对下方的主程序部分进行对应增减，单位 N
-stress_ratio = 0.1          # 应力比
+final = 21                  # 估算的最大裂纹长度，单位 mm
+load = [3200, 3300, 3400, 4000]         # 计算的载荷峰值，增加或删减需要对下方的主程序部分进行对应增减，单位 N
+stress_ratio = 0.7          # 应力比
 step = 0.25                    # 预估的裂纹扩展步长，单位 mm
 yield_strength = 0.446      # 材料的屈服强度，单位 Gpa
 
 
 # 绘图参数
-sequence = 'R=0.1_QSTE420TM'            # 保存文件名和绘图标题名
+sequence = 'R=0.7_QSTE420TM'            # 保存文件名和绘图标题名
 save = 0            # 保存开关
 show = 1            # 显示开关
 
@@ -44,7 +45,7 @@ def predict(load):
     # valid：有效性判断结果
     cracklength = np.arange(start, final+step, step)
     dk_predict = experiment_predict.DeltaKPredict(w=width, thickness=thickness, start=start, final=final, load=load, r=stress_ratio, step=step)
-    dadn = mts_analysis.ParisCalculating(c=c, m=m, dk=dk_predict)
+    dadn = mts_analysis.WalkerCalculating(c0=c, m0=m, gamma=gamma, dk=dk_predict, r=stress_ratio)
     cycle = experiment_predict.CycleIntegrateBySimpson(c=c, m=m, dk=dk_predict, cracklength=cracklength)
     valid = []
     for seq, value in enumerate(cracklength):
@@ -91,21 +92,24 @@ if show:
 
 # FCGR - CrackLength Plotting
 plt.figure(num=2, figsize=(7, 5))
-plt.plot(a1, dadn1, label='$P_m = $'+str(load[0])+'$N$', color='red', linewidth=2)
-plt.plot(a2, dadn2, label='$P_m = $'+str(load[1])+'$N$', color='blue', linewidth=2)
-plt.plot(a3, dadn3, label='$P_m = $'+str(load[2])+'$N$', color='purple', linewidth=2)
-plt.plot(a4, dadn4, label='$P_m = $'+str(load[3])+'$N$', color='orange', linewidth=2)
-plt.scatter([a1[invalidseq1], a2[invalidseq2], a3[invalidseq3], a4[invalidseq4]],
+plt.plot(dk1, dadn1, label='$P_m = $'+str(load[0])+'$N$', color='red', linewidth=2)
+plt.plot(dk2, dadn2, label='$P_m = $'+str(load[1])+'$N$', color='blue', linewidth=2)
+plt.plot(dk3, dadn3, label='$P_m = $'+str(load[2])+'$N$', color='purple', linewidth=2)
+plt.plot(dk4, dadn4, label='$P_m = $'+str(load[3])+'$N$', color='orange', linewidth=2)
+plt.scatter([dk1[invalidseq1], dk2[invalidseq2], dk3[invalidseq3], dk4[invalidseq4]],
             [dadn1[invalidseq1], dadn2[invalidseq2], dadn3[invalidseq3], dadn4[invalidseq4]],
             marker='*', label='Invalid Points')
-plt.xlabel("a/mm")
-plt.xlim(start, final)
+plt.xlabel("SIF Range/MPa.m0.5")
+plt.axis([min(dk1), dk4[invalidseq4]*1.1, min(dadn1), dadn4[invalidseq4]*1.1])
 plt.ylabel("FCG rate/mm per cycle")
+plt.xscale('log')
 plt.yscale('log')
-plt.title('FCGR - CrackLength Ploting_'+sequence)
+plt.title('FCGR - SIF Range_'+sequence)
+plt.grid(which='minor', linestyle='--')
+plt.grid(which='major', linestyle='--')
 plt.legend()
 plt.grid()
 if save:
-    plt.savefig('dadn_a'+sequence+'.png', dpi=320)
+    plt.savefig('dadn_dk'+sequence+'.png', dpi=320)
 if show:
     plt.show()

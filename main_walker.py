@@ -13,7 +13,8 @@ from FCGAnalysisLib import read_data
 from FCGAnalysisLib import mts_analysis
 
 show = 1
-sequence = np.array(["yang-baoban_Lu-420-01", "yang-baoban_Lu-420-02", "yang-baoban_Lu-420-03", "yang-baoban_Lu-420-04"])
+sequence = np.array(["yang-baoban_Lu-420-01", "yang-baoban_Lu-420-02", "yang-baoban_Lu-420-03", "yang-baoban_Lu-420-04",
+                     "yang-baoban_Lu-420-11", "yang-baoban_Lu-420-13"])
 
 dadn1, cycles1, dk1 = read_data.ReadMtsResult(sequence=sequence[0])
 c1, m1 = mts_analysis.ParisFitting(dadn=dadn1, dk=dk1)
@@ -27,14 +28,9 @@ print("Specimen:", sequence[1], ",Paris:c=", str(c2), ",m=", str(m2))
 
 threshold = 15.5
 dadn3_temp, cycles3_temp, dk3_temp = read_data.ReadMtsResult(sequence=sequence[2])
-dadn3 = dadn3_temp
-cycles3 =cycles3_temp
-dk3 = dk3_temp
-
 dadn3 = mts_analysis.DataSelectByThreshold(threshold=threshold, parameter=dk3_temp, data=dadn3_temp)
 cycles3 = mts_analysis.DataSelectByThreshold(threshold=threshold, parameter=dk3_temp, data=cycles3_temp)
 dk3 = mts_analysis.DataSelectByThreshold(threshold=threshold, parameter=dk3_temp, data=dk3_temp)
-
 c3, m3 = mts_analysis.ParisFitting(dadn=dadn3, dk=dk3)
 print("Specimen:", sequence[2], ",Paris:c=", str(c3), ",m=", str(m3))
 # 读#03数据，筛去DK<15的部分，拟合Paris
@@ -43,6 +39,20 @@ dadn4, cycles4, dk4 = read_data.ReadMtsResult(sequence=sequence[3])
 c4, m4 = mts_analysis.ParisFitting(dadn=dadn4, dk=dk4)
 print("Specimen:", sequence[3], ",Paris:c=", str(c4), ",m=", str(m4))
 # 读#04数据并拟合Paris
+
+dadn5, cycles5, dk5 = read_data.ReadMtsResult(sequence=sequence[4])
+c5, m5 = mts_analysis.ParisFitting(dadn=dadn5, dk=dk5)
+print("Specimen:", sequence[4], ",Paris:c=", str(c5), ",m=", str(m5))
+# 读#11数据并拟合Paris
+
+threshold = 15.0
+dadn6_temp, cycles6_temp, dk6_temp = read_data.ReadMtsResult(sequence=sequence[5])
+dadn6 = mts_analysis.DataSelectByThreshold(threshold=threshold, parameter=dk6_temp, data=dadn6_temp)
+cycles6 = mts_analysis.DataSelectByThreshold(threshold=threshold, parameter=dk6_temp, data=cycles6_temp)
+dk6 = mts_analysis.DataSelectByThreshold(threshold=threshold, parameter=dk6_temp, data=dk6_temp)
+c6, m6 = mts_analysis.ParisFitting(dadn=dadn6, dk=dk6)
+print("Specimen:", sequence[5], ",Paris:c=", str(c6), ",m=", str(m6))
+# 读#13数据，筛去DK<15的部分，拟合Paris
 
 dadn_r01 = np.concatenate((dadn1, dadn2))
 dk_r01 = np.concatenate((dk1, dk2))
@@ -58,6 +68,13 @@ print("r = 0.7:", ",Paris:c=", str(c_r07), ",m=", str(m_r07))
 # 合并#03和#04数据(r=0.7)并拟合Paris
 
 
+dadn_r05 = np.concatenate((dadn5, dadn6))
+dk_r05 = np.concatenate((dk5, dk6))
+c_r05, m_r05 = mts_analysis.ParisFitting(dadn=dadn_r05, dk=dk_r05)
+print("r = 0.5:", ",Paris:c=", str(c_r05), ",m=", str(m_r05))
+# 合并#11和#13数据(r=0.5)并拟合Paris
+
+
 c0b, m0b, gammab = mts_analysis.WalkerFittingByRegression(dadn1=dadn_r01, dk1=dk_r01, r1=0.1, dadn2=dadn_r07, dk2=dk_r07, r2=0.7)
 print("Walker's model by Regression: c0 =", str(c0b), ",m0 =", str(m0b), ",gamma=", str(gammab))
 # 直接由dadn和dk回归得Walker模型参数
@@ -68,11 +85,14 @@ dadn_walker = mts_analysis.WalkerCalculating(c0=c0b, m0=m0b, gamma=gammab, dk=dk
 
 dk_walker_r01 = np.arange(np.min(dk_r01), np.max(dk_r01), 1)
 dadn_walker_r01 = mts_analysis.WalkerCalculating(c0=c0b, m0=m0b, gamma=gammab, dk=dk_walker_r01, r=0.1)
+dk_walker_r05 = np.arange(np.min(dk_r05), np.max(dk_r05), 1)
+dadn_walker_r05 = mts_analysis.WalkerCalculating(c0=c0b, m0=m0b, gamma=gammab, dk=dk_walker_r05, r=0.5)
 dk_walker_r07 = np.arange(np.min(dk_r07), np.max(dk_r07), 1)
 dadn_walker_r07 = mts_analysis.WalkerCalculating(c0=c0b, m0=m0b, gamma=gammab, dk=dk_walker_r07, r=0.7)
-# 用Walker模型分别拟合R=0.1和R=0.7的情况
+# 用Walker模型分别拟合R=0.1,0.5,0.7的情况
 
 dk_eq_r01 = dk_r01*(1 - 0.1)**(gammab - 1)
+dk_eq_r05 = dk_r05*(1 - 0.5)**(gammab - 1)
 dk_eq_r07 = dk_r07*(1 - 0.7)**(gammab - 1)
 dk_walker_eq = np.arange(min(dk_eq_r07), max(dk_eq_r01), 1)
 dadn_walker_eq = c0b*dk_walker_eq**m0b
@@ -81,10 +101,12 @@ dadn_walker_eq = c0b*dk_walker_eq**m0b
 
 # Plotting: (1)da/dN - dk - r 3D plot
 r01 = np.full(len(dk_r01), 0.1)
+r05 = np.full(len(dk_r05), 0.5)
 r07 = np.full(len(dk_r07), 0.7)
 fig = plt.figure(figsize=(7, 5), dpi=320, num=1)
 ax = plt.subplot(111, projection='3d')
 ax.scatter(np.log(dk_r01), np.log(1-r01), np.log(dadn_r01), s=1, label='$r=0.1$', color='red', lw=1)
+ax.scatter(np.log(dk_r05), np.log(1-r05), np.log(dadn_r05), s=1, label='$r=0.5$', color='orange', lw=1)
 ax.scatter(np.log(dk_r07), np.log(1-r07), np.log(dadn_r07), s=1, label='$r=0.7$', color='blue', lw=1)
 Axes3D.plot_surface(self=ax, X=np.log(dk_walker), Y=np.log(1-r_walker), Z=np.log(dadn_walker), rstride=1, cstride=1, cmap=plt.get_cmap('rainbow'))
 ax.set_xlabel("log(DeltaK Applied)/MPa*m^0.5")
@@ -96,8 +118,10 @@ if show:
 # Plotting: (2)dadN - dk 2D plot in dk
 plt.figure(num=1, figsize=(10, 8))
 plt.scatter(dk_r01, dadn_r01, lw=1, marker='+', label='R=0.1')
+plt.scatter(dk_r05, dadn_r05, lw=1, marker='2', label='R=0.5')
 plt.scatter(dk_r07, dadn_r07, lw=1, marker='*', label='R=0.7')
 plt.plot(dk_walker_r01, dadn_walker_r01, label='WalkerFit R=0.1', color='black', linewidth=2)
+plt.plot(dk_walker_r05, dadn_walker_r05, label='WalkerCalculation R=0.5', color='blue', linewidth=2)
 plt.plot(dk_walker_r07, dadn_walker_r07, label='WalkerFit R=0.7', color='red', linewidth=2)
 plt.axis([min(dk_r07), max(dk_r01), min(dadn_r07), max(dadn_r01)*1.2])
 plt.yticks(np.linspace(min(dadn_r07)*0.9, max(dadn_r01), 6))
@@ -116,6 +140,7 @@ if show:
 # Plotting: (2)dadN - dk 2D plot
 plt.figure(num=3, figsize=(10, 8))
 plt.scatter(dk_eq_r01, dadn_r01, lw=1, marker='+', label='R=0.1')
+plt.scatter(dk_eq_r05, dadn_r05, lw=1, marker='2', label='R=0.5')
 plt.scatter(dk_eq_r07, dadn_r07, lw=1, marker='*', label='R=0.7')
 plt.plot(dk_walker_eq, dadn_walker_eq, label='WalkerFit', color='black', linewidth=2)
 plt.axis([min(dk_eq_r07), max(dk_eq_r01), min(dadn_r07), max(dadn_r01)*1.2])
