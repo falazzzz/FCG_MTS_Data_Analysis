@@ -1,4 +1,6 @@
 # 处理数据结果函数库
+# Last Update: 2018/4/11 Version 2.2.0
+# Lu Yunchao
 
 import numpy as np
 import scipy.optimize as opt
@@ -36,7 +38,18 @@ def ParisCalculating(c, m, dk):
     return dadn
 
 
-def WalkerFittingFromParis(c, m, r):
+def ParisInverseCalculation(c, m, dadn):
+    # 完成依据Paris公式的逆运算
+    # input arguments:
+    # c, m: Paris参数
+    # dadn：要计算的裂纹扩展速率
+    # return argument:
+    # dk：由Paris逆运算的计算结果
+    dk = (dadn/c)**(1/m)
+    return dk
+
+
+def WalkerFittingFromParis(dadn1, dk1, r1, dadn2, dk2, r2, m):
     # usage: 通过不同应力比下的Paris参数拟合Walker模型，输出Walker模型参数C0，m0, gamma
     # NOTE: 该方法参考论文 Modelling the fatigue crack growth in friction stir welded joint of 2024-T351 Al alloy
     # m0取不同应力比下paris参数m的平均值
@@ -51,23 +64,23 @@ def WalkerFittingFromParis(c, m, r):
     # Walker公式参数gamma，无量纲
     m = np.array(m)
     m0 = np.average(m)
-    c = np.array(c)
-    Y = np.log(c)
-    r = np.array(r)
-    X = np.log(1 - r)
+    Y = np.concatenate((np.log(dadn1), np.log(dadn2))) - m0 * np.concatenate((np.log(dk1), np.log(dk2)))
+    r_1 = np.full(len(dadn1), r1)
+    r_2 = np.full(len(dadn2), r2)
+    X = np.log(1 - np.concatenate((r_1, r_2)))
 
     def residual_walker(p):
         K, B = p
-        return Y - (K * X + B)  # 应力比R = 0.1
+        return Y - (K * X + B)
 
     r = opt.leastsq(residual_walker, np.array([1, 1]))
     k, b = r[0]
     c0 = np.exp(b)
-    gamma = k / m0 + 1
+    gamma = k/m0 + 1
     return c0, m0, gamma
 
 
-def WalkerFittingByRegression(dadn1, dk1, r1, dadn2, dk2, r2):
+def WalkerFittingByRegression(dadn1, dk1, r1, dadn2, dk2, r2, dadn3=[], dk3=[], r3=0):
     # usage: 通过不同应力比实验得到的dadn和dk数据拟合Walker模型，输出Walker模型参数C0，m0, gamma
     # NOTE: 目前只能拟合两个应力比的数据，值对数化后直接进行三元平面拟合
     #      log(da/dN) = m*log(dk) + m(gamma-1)*log(1-r) + logc0
@@ -81,17 +94,25 @@ def WalkerFittingByRegression(dadn1, dk1, r1, dadn2, dk2, r2):
     # Walker公式参数m0，无量纲
     # Walker公式参数gamma，无量纲
     #
-    # 该函数尚待检验
+    # 函数通过检验
     #
-    Z = np.concatenate((np.log(dadn1), np.log(dadn2)))
-    X = np.concatenate((np.log(dk1), np.log(dk2)))
-    r_1 = np.full(len(dadn1), r1)
-    r_2 = np.full(len(dadn2), r2)
-    Y = np.log(1 - np.concatenate((r_1, r_2)))
+    if len(dadn3) == 0:
+        Z = np.concatenate((np.log(dadn1), np.log(dadn2)))
+        X = np.concatenate((np.log(dk1), np.log(dk2)))
+        r_1 = np.full(len(dadn1), r1)
+        r_2 = np.full(len(dadn2), r2)
+        Y = np.log(1 - np.concatenate((r_1, r_2)))
+    else:
+        Z = np.concatenate((np.log(dadn1), np.log(dadn2), np.log(dadn3)))
+        X = np.concatenate((np.log(dk1), np.log(dk2), np.log(dk3)))
+        r_1 = np.full(len(dadn1), r1)
+        r_2 = np.full(len(dadn2), r2)
+        r_3 = np.full(len(dadn3), r3)
+        Y = np.log(1 - np.concatenate((r_1, r_2, r_3)))
 
     def residual_walker(p):
         A, B, C = p
-        return Z - (A * X + B * Y + C)
+        return np.abs(A*X + B*Y - Z + C)/math.sqrt(A**2 + B**2 + 1)
 
     r = opt.leastsq(residual_walker, np.array([4., 0., -20.]))
     a, b, c = r[0]
@@ -219,7 +240,7 @@ def Compliance(e, b, w, p, v):
 
 
 def DeltaKCalculating(b, w, a, pmax, pmin):
-    # usage: 依据E647-11标准计算CT试件的SIF变幅，适用范围a/W >= 0.2
+    # usage: 依据E647-11标准计算CT试件的SIF变幅，适用范围a/W >= 0.2且韧带长度有效
     # input parameter:
     # b: 试件厚度thickness，单位 mm
     # w: 试件宽度Width，单位 mm
@@ -241,6 +262,31 @@ def DeltaKCalculating(b, w, a, pmax, pmin):
     m3 = kc0 + kc1 * alpha + kc2 * alpha ** 2 + kc3 * alpha ** 3 + kc4 * alpha ** 4
     deltaK = m1 * m2 * m3 * factor_for_k
     return deltaK
+
+
+def DeltaKCalculatingByMurakami(b, w, a, pmax, pmin):
+    # usage: 依据Murakami在1987年给出的公式计算CT试件的SIF变幅，适用范围a/W >= 0.2且韧带长度有效
+    # input parameter:
+    # b: 试件厚度thickness，单位 mm
+    # w: 试件宽度Width，单位 mm
+    # a：对应裂纹长度，单位 mm
+    # pmax：对应载荷最大值，单位 N
+    # pmin：对应载荷最小值，单位 N
+    # return parameter:
+    # deltaK：SIF变幅，单位 MPa.m0.5
+    alphas = a/w
+    p = pmax - pmin
+    s1 = 16.7
+    s2 = -104.7
+    s3 = 369.9
+    s4 = -573.8
+    s5 = 360.5
+    k1 = []
+    for seq, alpha in enumerate(alphas):
+        k1l = (p[seq]/b)*math.sqrt(math.pi/w)
+        k1r = (s1*alpha**0.5 + s2*alpha**1.5 + s3*alpha**2.5 + s4*alpha**3.5 + s5*alpha**4.5)
+        k1.append(k1l * k1r / math.sqrt(1e3))
+    return np.array(k1)
 
 
 def FCGRateBySecant(a, n, dk, select=True):
@@ -353,7 +399,7 @@ def DataSelectByLigament(w, a, dk, ys, data, r=0.1):
     return newdata
 
 
-def DataSelectByThreshold(threshold, parameter, data):
+def DataSelectByThreshold(threshold, parameter, data, keepbigger=1):
     # usage: 根据门槛值threshold进行筛选，
     # 若参考数组parameter的值大于等于阈值，则将排序对应的data数组中的数据保留，反之则丢弃
     # input parameter:
@@ -364,9 +410,71 @@ def DataSelectByThreshold(threshold, parameter, data):
     # newdata：筛选后的data数组
     newdata = []
     for seq, value in enumerate(parameter):
-        if value >= threshold:
+        if keepbigger == 0:
+            if value < threshold:
+                newdata.append(data[seq])
+        elif value >= threshold:
             newdata.append(data[seq])
     return newdata
+
+
+def DataSelectByRatio(ratio, points, average, data):
+    # usage: 根据比例ratio进行筛选，
+    # 若参考数组parameter的值在半宽度为ratio误差带内，则将排序对应的data数组中的数据保留，反之则丢弃
+    # input parameter:
+    # ratio: 误差带半宽度
+    # points：被筛选的数据（波动性大的点）
+    # average：被筛选的数据的判断标准（即误差带的中轴）
+    # data：被筛选的数组，通过数组序号进行筛选
+    # return parameter：
+    # newdata：筛选后的data数组
+    newdata = []
+    for seq, value in enumerate(points):
+        if (1 - ratio)*value < average[seq] < (1 + ratio)*value:
+            newdata.append(data[seq])
+    return newdata
+
+
+def FCGDataSelectByThreshold(dadn, dk, threshold, a=[], n=[], target='dk', keepbigger=1):
+    # usage: 一组筛选FCG的四个主要参数dadn、dk、n和a，保留阈值以上/下的值
+    # input parameter:
+    # dadn, dk, n, a: 筛选前四个主要参数的原始数据，其中a、n可不输入，但不输入a、n时只能用dk为筛选参量
+    # threshold: 筛选的阈值
+    # target：筛选的参数，可选:'dk', 'a', 'n'
+    # keepbigger：1：保留大于阈值的部分，0：保留小于阈值的部分
+    # return parameter:
+    # dadn_new, dk_new, n_new, a_new：筛选保留下的新数据
+    if target == 'dk':
+        parameter = dk
+    elif target == 'a':
+        parameter = a
+        if len(a) == 0:
+            print('FCGDataSelectByThreshold Function Error: No cracklength data input while selecting by cracklength.')
+    elif target == 'n':
+        parameter = n
+        if len(n) == 0:
+            print('FCGDataSelectByThreshold Function Error: No cycles data input while selecting by cycles.')
+    else:
+        print('Error parameter: target, set dk as default.')
+        parameter = 'dk'
+    dadn_new = DataSelectByThreshold(threshold=threshold, parameter=parameter,
+                                     data=dadn, keepbigger=keepbigger)
+    dk_new = DataSelectByThreshold(threshold=threshold, parameter=parameter,
+                                   data=dk, keepbigger=keepbigger)
+    if len(n) != 0:
+        n_new = DataSelectByThreshold(threshold=threshold, parameter=parameter,
+                                      data=n, keepbigger=keepbigger)
+    if len(a) != 0:
+        a_new = DataSelectByThreshold(threshold=threshold, parameter=parameter,
+                                      data=a, keepbigger=keepbigger)
+    if len(n) == 0 and len(a) == 0:
+        return np.array(dadn_new), np.array(dk_new)
+    elif len(n) != 0 and len(a) == 0:
+        return np.array(dadn_new), np.array(dk_new), np.array(n_new)
+    elif len(n) == 0 and len(a) != 0:
+        return np.array(dadn_new), np.array(dk_new), np.array(a_new)
+    else:
+        return np.array(dadn_new), np.array(dk_new), np.array(n_new), np.array(a_new)
 
 
 def FindAscentDataBySeq(value, item, target):
@@ -383,6 +491,7 @@ def FindAscentDataBySeq(value, item, target):
     seq = 0
     if value > item[-1] or value < item[0]:
         result = 0
+        print('FunctionFindAscentDataBySeqERROR: Value cannot be found in the list.')
         return result
     while seq < len(item):
         if item[seq] >= value:
@@ -391,3 +500,58 @@ def FindAscentDataBySeq(value, item, target):
             break
         seq = seq + 1
     return result
+
+
+def CTS_Richard_K1_calculate(f, r, a, w, b, alpha):
+    # 根据Richard提出的公式，计算对应裂纹长度下CTS试件的K1值
+    # Testing 20180705
+    # 输入单位：力N，长度mm，角度为弧度制
+    # 适用范围: 0.5<=a/W<=0.7
+    df = f * (1 - r)
+    x1 = (df / w / b) * np.sqrt(np.pi * a)
+    x2 = np.cos(alpha) / (1 - a / w)
+    factor = a / (w - a)
+    x3 = np.sqrt((0.26 + 2.65 * factor)) / (1 + 0.55*factor - 0.08*factor**2)
+    ctsK1 = x1*x2*x3/factor_for_k
+    return ctsK1
+
+
+def CTS_Richard_K2_calculate(f, r, a, w, b, alpha):
+    # 根据Richard提出的公式，计算对应裂纹长度下CTS试件的K2值
+    # Testing 20180705
+    # 输入单位：力N，长度mm，角度为弧度制
+    # 适用范围: 0.5<=a/W<=0.7
+    df = f * (1 - r)
+    x1 = (df / w / b) * np.sqrt(np.pi * a)
+    x2 = np.sin(alpha) / (1 - a / w)
+    factor = a / (w - a)
+    x3 = np.sqrt((-0.23 + 1.40 * factor)) / (1 - 0.67*factor + 2.08*factor**2)
+    ctsK2 = x1*x2*x3/factor_for_k
+    return ctsK2
+
+
+def CTS_Soon_K1_calculate(f, r, a, w, b, alpha):
+    # 根据Soon提出的公式，计算对应裂纹长度下CTS试件的K1值
+    # Testing 20180706
+    # 输入单位：力N，长度mm，角度为弧度制
+    # 适用范围: 0.3<=a/W<=0.5
+    df = f * (1 - r)
+    x1 = df * np.sqrt(np.pi*a) / (w*b)
+    x2 = np.cos(alpha) * np.sqrt(np.cos(alpha/3))
+    f1 = 2.32158 - 14.36777*a/w + 66.85752*(a/w)**2 - 117.66921*(a/w)**3 + 89.72502*(a/w)**4
+    ctsK1 = x1*x2*f1/factor_for_k
+    return ctsK1
+
+
+def CTS_Soon_K2_calculate(f, r, a, w, b, alpha):
+    # 根据Soon提出的公式，计算对应裂纹长度下CTS试件的K2值
+    # Testing 20180706
+    # 输入单位：力N，长度mm，角度为弧度制
+    # 适用范围: 0.3<=a/W<=0.5
+    df = f * (1 - r)
+    x1 = df * np.sqrt(np.pi * a) / (w * b)
+    x2 = np.sin(alpha)
+    f2 = -0.05741 + 4.36076*(a/w) - 4.46168*(a/w)**2 + 2.48807*(a/w)**3
+    ctsK2 = x1 * x2 * f2 / factor_for_k
+    return ctsK2
+

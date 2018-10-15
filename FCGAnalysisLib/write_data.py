@@ -1,6 +1,16 @@
 # 结果输出函数库
+# Last Update: 2018/5/25 Version 2.3.0
+# Lu Yunchao
 
 import pandas as pd
+import numpy as np
+import time
+
+
+def timestring():
+    # usage：输出当前时间，以YYMMDD_HHMMSS的格式
+    time_string = time.strftime('%Y%m%d_%H%M%S', time.localtime(time.time()))
+    return time_string
 
 
 def ArrangeData(dadn, cycles, dk, a=[], option="dk", step=1, save=True, name="temp"):
@@ -58,3 +68,38 @@ def ArrangeData(dadn, cycles, dk, a=[], option="dk", step=1, save=True, name="te
             con = pd.concat([dadn_arranged, cycles_arranged, dk_arranged], axis=1)
             con.to_csv("FCG_MTSData_"+name+".csv", index=False, sep=",")
         return pd.DataFrame({"dadN": dadn_arranged, "cycles": cycles_arranged, "dk": dk_arranged})
+
+
+def SaveData(dataset, name, filename="_"):
+    # dataset和name需为numpy数组格式，dataset的数据和name位置一一对应
+    # Note:对于长度不一的数据，最后部分会被填零
+
+    # 寻找数组长度最大值
+    maxlength = 0
+    for data in dataset:
+        if maxlength < data.shape[0]:
+            maxlength = data.shape[0]
+
+    # 数组方阵化
+    datamatrix = []
+    for data in dataset:
+        fixed_data = []
+        if data.shape[0] < maxlength:
+            fixlength = maxlength - data.shape[0]
+            fixlist = np.zeros(fixlength)
+            fixed_data = np.concatenate((data, fixlist))
+        else:
+            fixed_data = data
+        datamatrix.append(fixed_data)
+
+    # 数据格式转化
+    datamatrix = np.array(datamatrix)
+    datamatrix = pd.DataFrame(data=datamatrix.T, columns=name)
+    if filename == "_":
+        time_string = timestring()
+        filename = "temp_"+time_string
+
+
+    datamatrix.to_csv(filename+".csv", index=False, sep=',')
+    print("Data Saved to File:"+filename+".csv")
+    return 1

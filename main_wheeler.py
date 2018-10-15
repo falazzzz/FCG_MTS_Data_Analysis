@@ -1,224 +1,117 @@
-import pandas as pd
-import numpy as np
-import mts_analysis
+# 采用Salvati提出的带延迟的Wheeler模型计算
+# 2018/7/2 Version 2.0
+# Lu Yunchao
+
 import math
-import read_data
-import experiment_calculation
 import matplotlib.pyplot as plt
+import numpy as np
+from FCGAnalysisLib import read_data
+from FCGAnalysisLib import mts_analysis
+from FCGAnalysisLib import experiment_calculation
+from FCGAnalysisLib import overload_analysis
+from FCGAnalysisLib import paris_and_walker
 
 
-def ReadTensionResult(sequence):
-    # usage:读取简单拉伸实验结果数据
-    # input parameter:
-    # sequence: 试件序号
-    # return parameter:
-    # extension：位移/mm
-    # load：载荷/N
-    # stress：工程应力/MPa
-    # strain：工程应变/MPa
-    tensionresult = pd.read_csv(u"QSTE420TM_TensionTest_" + sequence + u".csv")  # Data File Reading
-    extension = tensionresult["Extension (mm)"]
-    load = tensionresult["Load (N)"]
-    stress = tensionresult["Stress (MPa)"]
-    strain = tensionresult["Strain (%)"] * 0.01
-    return extension, load, stress, strain
-
-
-def TrueStress(engineeringstress, engineeringstrain):
-    # usage：由工程应力和工程应变计算真实应力
-    truestress = engineeringstress * (1 + engineeringstrain)
-    return truestress
-
-
-def TrueStrain(engineeringstrain):
-    # usage：由工程应变计算真实应变
-    truestrain = np.log(1 + engineeringstrain)
-    return truestrain
-
-
-def RambergOsgoodFitting(s, e, ys, E):
-    # usage: 由真实应力和真实应变拟合Ramberg-Osgood本构模型
-    # input parameter:
-    # s: 真实应力/MPa
-    # e：真实应变
-    # ys：屈服强度/GPa
-    # E：弹性模量/GPa
-    # return parameter:
-    # n: Ramberg-Osgood模型参数（硬化指数）
-    # alpha: Ramberg-Osgood模型参数
-    ys = ys * 1e3
-    E = E * 1e3
-    Y0 = np.array([(E/ys)*strain for strain in e])
-    Y1 = np.array([stress/ys for stress in s])
-    Y = np.log(Y0 + Y1)
-    del Y0, Y1
-    X = np.log([stress/ys for stress in s])
-    p = np.polyfit(X, Y, deg=1)
-    n, B = p
-    alpha = np.exp(B)
-    return n, alpha
-
-
-def RambergOsgoodCalculation(n, alpha, s, ys, E):
-    # usage: 由已经得到的Ramberg-Osgood参数和需要拟合的真实应力值，以该本构关系计算真实应变
-    # input parameter:
-    # n，alpha：Ramberg-Osgood模型参数
-    # s：真实应力/MPa
-    # ys：屈服强度/GPa
-    # E：弹性模量/GPa
-    # return parameter:
-    # e：由Ramberg-Osgood本构关系计算得到的真实应变
-    e = []
-    ys = ys * 1e3
-    E = E * 1e3
-    for stress in s:
-        left = stress/ys + alpha*(stress/ys)**n
-        e.append(left*ys/E)
-    return np.array(e)
-
-
-def PlasticZoneWithFactor(kmax, ys, factor):
-    # usage: 计算Irwin及其改进型的塑性区尺寸，表达式r = factor*(kmax/ys)^2，其中factor为塑性区系数
-    # input parameter:
-    # kmax：应力强度因子/MPa.m0.5
-    # ys：屈服强度/GPa
-    # factor：塑性区尺寸系数
-    # return parameter:
-    # r：塑形区尺寸/mm
-    r = []
-    ys = ys * 1e3
-    for kmaxs in kmax:
-        r.append((factor * (kmaxs/ys)**2)*1e3)
-    return np.array(r)
-
-
-def WheelerRetardationParameter(rm, aol, rol, a, m):
-    # usage:
-    # input parameter:
-    # sequence:
-    # return parameter:
-    #
-    return 0
-
-sequence = ["b-1#", "yang-baoban_Lu-420-06"]
+# 实验参数
+sequence = ["yang-baoban_Lu-420-06"]
 stress_ratio = 0.1
-threshold = 18
-c_ca = 7.9713e-10
-m_ca = 3.6797
-# 参数设置
+threshold = 0
+pol = 4000
+ppeak = 2000
 
-l, f, s_engineering, e_engineering = ReadTensionResult(sequence=sequence[0])
+# 程序参数
+figsave = 0         # 图像保存开关
+show = 1            # 图像显示开关
+
+# paris公式参数读取
+c_ca, m_ca = paris_and_walker.ParisParameter(r=stress_ratio)
+
+# Wheeler模型拟合设定参数
+a_ol = 12.0057
+a_ol_applied = 12.0057
+a_fcgr_min = 12.4516   # 高载时dadN最低值对应的裂纹长度
+a_fcgr_max = 12.0057  # 高载时dadN最高值对应的裂纹长度
+
+ad = a_fcgr_min - a_fcgr_max  # retardation delay长度
+
+# 实验数据读取和初步处理(本函数不能用BasicDataDispose封装API，因函数要调用细节数据）
 specimen, width, notch_length, thickness, elastic_modulus, yield_strength, precrack_length = \
-    read_data.ReadTestInf(sequence=sequence[1])
-cycles, cracklength, kmax, kmin, pmax, pmin = read_data.ReadOriginResult(sequence[1], closure=False, cod=False)
+    read_data.ReadTestInf(sequence=sequence[0])
+cycles, cracklength, kmax, kmin, pmax, pmin = read_data.ReadOriginResult(sequence[0], closure=False, cod=False)
 dadn_Manual, n_Manual, dk_Manual, a_Manual = \
     experiment_calculation.FCGRandDKbyOriginalData(b=thickness, w=width, n=cycles, pmax=pmax, pmin=pmin,
                                                    a=cracklength,
                                                    ys=yield_strength, r=stress_ratio, threshold=threshold)
-e_true1 = TrueStrain(e_engineering)
-s_true1 = TrueStress(s_engineering, e_engineering)
-e_true = mts_analysis.DataSelectByThreshold(threshold=0.25, parameter=e_true1, data=e_true1, keepbigger=0)
-s_true = mts_analysis.DataSelectByThreshold(threshold=0.25, parameter=e_true1, data=s_true1, keepbigger=0)
-e_true0 = mts_analysis.DataSelectByThreshold(threshold=446, parameter=s_true, data=e_true, keepbigger=1)
-s_true0 = mts_analysis.DataSelectByThreshold(threshold=446, parameter=s_true, data=s_true, keepbigger=1)
-n, alpha = RambergOsgoodFitting(s=s_true0, e=e_true0, ys=yield_strength, E=elastic_modulus)
-# 筛选简单拉伸数据的拟合部分，仅采用塑性段进行拟合
-print("Ramberg-Osgood Fitting Result:n=%.4f" % n , ", alpha=%.4f" % alpha)
-slist = np.arange(0, 725, 25)
-elist = RambergOsgoodCalculation(n=n, alpha=alpha, s=slist, ys=yield_strength, E=elastic_modulus)
-print(yield_strength)
-# 拟合Ramberg-Osgood模型，得到n
 
-factor_plasticzone = (n - 1)/(n + 1)
-# 塑形区尺寸因子
+# 高载参数计算
+kol = mts_analysis.DeltaKCalculating(b=thickness, w=width, a=a_ol, pmax=pol, pmin=0)
+rol = overload_analysis.PlasticZoneWithFactor(kmax=np.array([kol]), ys=yield_strength, factor=1/math.pi)
 
-aol = 12.0057
-pol = 4000
-kol = mts_analysis.DeltaKCalculating(b=thickness, w=width, a=aol, pmax=pol, pmin=0)
-rol = PlasticZoneWithFactor(kmax=np.array([kol]), ys=yield_strength, factor=factor_plasticzone)
-# 高载值计算
+# 以高载时裂纹长度aol筛选出高载后的数据
+dadn_ola, dk_ola, n_ola, a_ola = \
+    mts_analysis.FCGDataSelectByThreshold(dadn=dadn_Manual, dk=dk_Manual, n=n_Manual, a=a_Manual,
+                                          threshold=a_fcgr_min, target='a', keepbigger=1)
 
-olrange = [20.55, 27.15]
-dadn_temp = mts_analysis.DataSelectByThreshold(threshold=olrange[0], parameter=dk_Manual, data=dadn_Manual, keepbigger=1)
-dk_temp = mts_analysis.DataSelectByThreshold(threshold=olrange[0], parameter=dk_Manual, data=dk_Manual, keepbigger=1)
-n_temp = mts_analysis.DataSelectByThreshold(threshold=olrange[0], parameter=dk_Manual, data=n_Manual, keepbigger=1)
-a_temp = mts_analysis.DataSelectByThreshold(threshold=olrange[0], parameter=dk_Manual, data=a_Manual, keepbigger=1)
-dadn_ol = mts_analysis.DataSelectByThreshold(threshold=olrange[1], parameter=dk_temp, data=dadn_temp, keepbigger=0)
-dk_ol = mts_analysis.DataSelectByThreshold(threshold=olrange[1], parameter=dk_temp, data=dk_temp, keepbigger=0)
-n_ol = mts_analysis.DataSelectByThreshold(threshold=olrange[1], parameter=dk_temp, data=n_temp, keepbigger=0)
-a_ol = mts_analysis.DataSelectByThreshold(threshold=olrange[1], parameter=dk_temp, data=a_temp, keepbigger=0)
-# 以DeltaK筛选出高载段的属性
-
-
-kmax_ol = np.array([dk/(1-stress_ratio) for dk in dk_ol])
-rm = PlasticZoneWithFactor(kmax=kmax_ol, ys=yield_strength, factor=1/math.pi)
 # 高载段参数计算
+kmax_ola = np.array([dk/(1-stress_ratio) for dk in dk_ola])
+rm_ola = overload_analysis.PlasticZoneWithFactor(kmax=kmax_ola, ys=yield_strength, factor=1/math.pi)
 
-left = a_ol + rm
-right = a_ol + rol
-for seq, _ in enumerate(left):
-    if left[seq] >= right[seq]:
-        dadn_ol = dadn_ol[0:seq]
-        dk_ol = dk_ol[0:seq]
-        n_ol = n_ol[0:seq]
-        a_ol = a_ol[0:seq]
-        print("Invalid Results Detected and Deleted.")
-        break
+# Wheeler模型指数系数m1拟合
+m1, _ = overload_analysis.WheelerFittingBaseParis(a=a_ola, dadn=dadn_ola, dk=dk_ola, rm=rm_ola, aol=a_ol, rol=rol,
+                                                  c=c_ca, m=m_ca)
 
-# Wheeler迟滞参数适用区域计算
+# 原始Wheeler模型计算
+alist = np.arange(a_fcgr_max, max(a_Manual), 0.02)
+dadn_wheeler, dk_wheeler, a_wheeler, cp_wheeler = \
+    overload_analysis.WheelerCalculatingBaseParis(a_wheeler=alist,
+                                                  b=thickness, w=width, ys=yield_strength, pmax=ppeak, r=stress_ratio,
+                                                  aol=a_ol, rol=rol, plasticzonefactor=1/math.pi,
+                                                  m1=m1, c=c_ca, m=m_ca)
 
-X = []
-Y = []
-for seq, _ in enumerate(dadn_ol):
-    y = np.log(dadn_ol[seq]) - m_ca*np.log(dk_ol[seq]) - np.log(c_ca)
-    Y.append(y)
-    x = np.log(rm[seq]) - np.log(aol + rol - a_ol[seq])
-    X.append(x)
-X = np.array(X).reshape(-1, )
-Y = np.array(Y)
-p = np.polyfit(X, Y, deg=1)
-m1, b = p
-print(m1, b)
-# Wheeler模型 m1系数拟合
+# 筛选出自dadN最高点往后的数据
+dadn_old, dk_old, n_old, a_old = \
+    mts_analysis.FCGDataSelectByThreshold(dadn=dadn_Manual, dk=dk_Manual, n=n_Manual, a=a_Manual,
+                                          threshold=a_fcgr_max, target='a', keepbigger=1)
 
-cp = []
-for seq, _ in enumerate(rm):
-    cpi = (rm[seq]/(aol + rol - a_ol[seq]))**m1
-    cp.append(cpi)
-cp = np.array(cp)
-dadn_wheeler = []
-for seq, _ in enumerate(dk_ol):
-    dadn = cp[seq]*(c_ca*dk_ol[seq]**m_ca)
-    dadn_wheeler.append(dadn)
-dadn_wheeler = np.array(dadn_wheeler)
-# Wheeler模型 拟合函数计算
+# 计算延迟结束位置（即dadN最低值对应的裂纹长度）对应的SIF
+kd = mts_analysis.DeltaKCalculating(b=thickness, w=width, a=a_fcgr_max+ad, pmax=ppeak, pmin=ppeak*stress_ratio)
+
+# 以alhpa_d为系数的延迟区域尺寸计算
+alpha_d = ad*1e-3 / ((kol/yield_strength*1e-3)**2 - (kd/yield_strength*1e-3)**2)
+rd_ol = overload_analysis.PlasticZoneWithFactor(kmax=[kol], ys=yield_strength, factor=alpha_d)
+rd_i = overload_analysis.PlasticZoneWithFactor(kmax=dk_old/(1-stress_ratio), ys=yield_strength, factor=alpha_d)
+
+# 按照已拟合得到的Wheeler模型计算实验点对应的Retardation Parameter
+cp_old = overload_analysis.CpCalculatingBaseParis(a=a_old, b=thickness, w=width, ys=yield_strength, pmax=ppeak,
+                                                  r=stress_ratio, aol=a_ol, rol=rol, plasticzonefactor=1/math.pi, m1=m1)
+
+# 拟合延迟系数m_mod
+m_mod, _ = overload_analysis.DelayFittingBaseParis(a=a_old, dadn=dadn_old, dk=dk_old, cp=cp_old,
+                                                   rd=rd_i, aol=a_ol_applied, rdol=rd_ol, c=c_ca, m=m_ca)
+
+# Salvati修正的Wheeler模型拟合
+dadn_salvati, dk_salvati, a_salvati, cd_salvati, cp_salvati = \
+    overload_analysis.SalvatiWheelerCalculatingBaseParis(astart=a_fcgr_max, afinal=max(a_Manual),
+                                                         b=thickness, w=width, ys=yield_strength,
+                                                         pmax=ppeak, r=stress_ratio, aol=a_ol, rol=rol,
+                                                         plasticzonefactor=1/math.pi, m1=m1, c=c_ca, m=m_ca,
+                                                         apre=a_ol_applied, rdol=rd_ol, delayfactor=alpha_d, m_mod=m_mod)
 
 # Plotting
-plt.figure(num=2, figsize=(10, 8))
-plt.scatter(e_engineering, s_engineering, lw=1, marker='+', label='Engineering')
-plt.scatter(e_true, s_true, lw=1, marker='*', label='True')
-plt.plot(elist, slist, label='Ramberg-Osgood Fitting', color='black', linewidth=2)
-plt.title("Stress - Strain Curve")
-plt.ylabel("Stress / MPa")
-plt.xlabel("Strain")
-plt.legend()
-plt.grid(which='minor', linestyle='--')
-plt.grid(which='major', linestyle='--')
-plt.show()
-
-plt.figure(num=3, figsize=(10, 8))
-plt.scatter(dk_ol, dadn_ol, lw=1, marker='+', label='Experiment')
-plt.plot(dk_ol, dadn_wheeler, label='Wheeler Model Fitting', color='black', linewidth=2)
-plt.title("FCG Rates - deltaSIF(Wheeler Model)")
+plt.figure(num=1, figsize=(10, 8))
+plt.scatter(dk_Manual, dadn_Manual, lw=1, marker='+', label='Experiment')
+plt.plot(dk_wheeler, dadn_wheeler, label='Wheeler Fitting', color='black', linewidth=2)
+plt.plot(dk_salvati, dadn_salvati, label='Modified Wheeler Fitting', linewidth=2)
+plt.title("FCG Rates - deltaK(Wheeler Model),OLR="+str(pol/ppeak))
 plt.ylabel("FCG Rates/mm per cycle")
 plt.xlabel("DeltaSIF/MPa.m0.5")
-
 plt.xscale('log')
 plt.yscale('log')
-plt.axis([min(dk_ol), max(dk_ol), min(dadn_wheeler), max(dadn_wheeler)*1.2])
-plt.yticks(np.linspace(min(dadn_wheeler)*0.8, max(dadn_wheeler), 6))
-plt.xticks(np.linspace(min(dk_ol), max(dk_ol), 6))
+plt.axis([min(10, min(dk_Manual)), max(20, max(dk_Manual)), min(dadn_Manual)*0.9, max(dadn_Manual)*1.1])
 plt.grid(which='minor', linestyle='--')
 plt.grid(which='major', linestyle='--')
 plt.legend()
-plt.show()
+if figsave:
+    plt.savefig('WheelerModel_' + sequence[0] + '.png', dpi=320)
+if show:
+    plt.show()

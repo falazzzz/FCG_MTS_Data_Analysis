@@ -17,49 +17,22 @@
 # Load：N
 
 
-import read_data
-import mts_analysis
-import experiment_calculation
-import write_data
-
+import numpy as np
+from FCGAnalysisLib import closureanalysis
+from FCGAnalysisLib import write_data
 
 # 文件参数
-sequence = "yang-baoban_Lu-420-01"         # Graph Saving Sequence
-stress_ratio = 0.1                         # Stress Ratio
-threshold = 0                              # Threshold for paris region selecting
+sequence = "yang-baoban_Lu-420-20"         # Graph Saving Sequence
+stress_ratio = 0.3                         # Stress Ratio
+filename = sequence + "_basic_inf"
 
-# 保存参数
-save = True                                # Save File or not
-dkstep = 1                                 # Recording Step for MTSResult
-astep = 0.5                                # Recording Step for ManualResult
 
 # 实验基本参数读取
-specimen, width, notch_length, thickness, elastic_modulus, yield_strength, precrack_length = \
-    read_data.ReadTestInf(sequence=sequence)
-print('specimen name:', str(specimen))
-# mm for length, GPa for strength and modulus
-
-
-# MTS数据读取和处理
-dadn_MTS, cycles_MTS, dk_MTS = read_data.ReadMtsResult(sequence=sequence)
-c_MTS, m_MTS = mts_analysis.ParisFitting(dadn=dadn_MTS, dk=dk_MTS)
-print("MTS Results Fitting Result by Paris:c=", str(c_MTS), ",m=", str(m_MTS))
-
-
-# 由裂纹长度、载荷、循环次数计算
-cycles, cracklength, kmax, kmin, pmax, pmin, codmax, codmin, = \
-    read_data.ReadOriginResult(sequence=sequence)
-
-dadn_Manual, n_Manual, dk_Manual, a_Manual = \
-    experiment_calculation.FCGRandDKbyOriginalData(b=thickness, w=width, n=cycles, pmax=pmax, pmin=pmin, a=cracklength,
-                                                   ys=yield_strength, r=stress_ratio, threshold=threshold)
-
-c_Manual, m_Manual = mts_analysis.ParisFitting(dadn=dadn_Manual, dk=dk_Manual)
-print("Manual Restlt Fitting by Paris: c=", str(c_Manual), ",m=", str(m_Manual))
-
+dadn_Manual, n_Manual, dk_Manual, a_Manual, kop_Manual = closureanalysis.BasicDataDispose(sequence=sequence, r=stress_ratio)
+print('specimen name:', sequence)
 
 # 结果文件输出
-MTSResult = write_data.ArrangeData(dadn=dadn_MTS, cycles=cycles_MTS, dk=dk_MTS,
-                                   option="dk", step=dkstep, save=save, name="MTSResult_"+sequence)
-ManualResult = write_data.ArrangeData(dadn=dadn_Manual, cycles=n_Manual, dk=dk_Manual, a=a_Manual,
-                                      option="a", step=astep, save=save, name="ManualResult_"+sequence)
+data = np.array([a_Manual, n_Manual, dk_Manual, dadn_Manual, kop_Manual])
+name = ['crack length', 'cycles', 'dK', 'dadn', 'K_open']
+_ = write_data.SaveData(dataset=data, name=name, filename=filename)
+
