@@ -182,7 +182,7 @@ def DoubleDataSelectMovingAverage(data, reference, ratio, numofaverage=7, weight
     # 第二次移动平均
     data_f = WeightedMovingAverage(data=data_2, numofaverage=numofaverage, weight=weight)
 
-    return data_f, reference_f
+    return np.array(data_f), np.array(reference_f)
 
 
 def BasicDataDispose(sequence, r, threshold=0):

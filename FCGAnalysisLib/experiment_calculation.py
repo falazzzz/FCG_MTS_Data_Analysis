@@ -6,7 +6,7 @@ from FCGAnalysisLib import tensiontest_analysis
 import numpy as np
 
 
-def FCGRandDKbyOriginalData(b, w, a, n, pmax, pmin, ys, r, kclosure=[], threshold=0):
+def FCGRandDKbyOriginalData(b, w, a, n, pmax, pmin, ys, r, kclosure=[], fop=[], threshold=0):
     # usage: 依据标准E647-11由载荷峰谷值、裂纹长度、循环次数计算FCGR并进行有效性检查
     # input parameter:
     # b：试件厚度thickness，mm
@@ -18,6 +18,7 @@ def FCGRandDKbyOriginalData(b, w, a, n, pmax, pmin, ys, r, kclosure=[], threshol
     # ys：材料屈服强度，GPa
     # r：应力比
     # kclosure：裂纹闭合时应力强度因子，默认为空数组（不输出）
+    # fop：裂纹闭合载荷，默认不输出
     # threshold：DeltaK阈值筛选，将删去小于阈值的数据，默认为0（不筛选）
     # return parameter：
     # dadn_ligament_valid：裂纹扩展速率
@@ -34,6 +35,8 @@ def FCGRandDKbyOriginalData(b, w, a, n, pmax, pmin, ys, r, kclosure=[], threshol
     dk_ligament_valid = mts_analysis.DataSelectByLigament(w=w, a=a_poly, dk=dk_poly, ys=ys, data=dk_poly, r=r)
     if len(kclosure) != 0:
         kc_ligament_valid = mts_analysis.DataSelectByLigament(w=w, a=a_poly, dk=dk_poly, ys=ys, data=kclosure, r=r)
+    if len(fop) != 0:
+        fop_ligament_valid = mts_analysis.DataSelectByLigament(w=w, a=a_poly, dk=dk_poly, ys=ys, data=fop, r=r)
     #print("Data Deleted by Ligament Check:", str(len(a_poly) - len(a_ligament_valid)))
     # 依据标准进行韧带长度有效性筛选
     n_valid = mts_analysis.DataSelectByThreshold(threshold=threshold, parameter=dk_ligament_valid, data=n_ligament_valid)
@@ -42,11 +45,19 @@ def FCGRandDKbyOriginalData(b, w, a, n, pmax, pmin, ys, r, kclosure=[], threshol
     dk_valid = mts_analysis.DataSelectByThreshold(threshold=threshold, parameter=dk_ligament_valid, data=dk_ligament_valid)
     if len(kclosure) != 0:
         kc_valid = mts_analysis.DataSelectByThreshold(threshold=threshold, parameter=dk_ligament_valid, data=kc_ligament_valid)
+    if len(fop) != 0:
+        fop_valid = mts_analysis.DataSelectByThreshold(threshold=threshold, parameter=dk_ligament_valid, data=fop_ligament_valid)
     # 依据DeltaK阈值进行筛选（可用于筛去DeltaK小于Paris区域的值）
     if len(kclosure) == 0:
-        return np.array(dadn_valid), np.array(n_valid), np.array(dk_valid), np.array(a_valid)
+        if len(fop) == 0:   # Kop,Fop均未输入的情况
+            return np.array(dadn_valid), np.array(n_valid), np.array(dk_valid), np.array(a_valid)
+        else:               # Kop未输入，Fop输入的情况
+            return np.array(dadn_valid), np.array(n_valid), np.array(dk_valid), np.array(a_valid), np.array(fop_valid)
     else:
-        return np.array(dadn_valid), np.array(n_valid), np.array(dk_valid), np.array(a_valid), np.array(kc_valid)
+        if len(fop) == 0:   # Kop输入，Fop未输入的情况
+            return np.array(dadn_valid), np.array(n_valid), np.array(dk_valid), np.array(a_valid), np.array(kc_valid)
+        else:               # Kop,Fop均输入的情况
+            return np.array(dadn_valid), np.array(n_valid), np.array(dk_valid), np.array(a_valid), np.array(kc_valid), np.array(fop_valid)
 
 
 def RambergOsgoodFitFromOriginal(s, e, ys, E, uplimit=1, lowlimit=0):

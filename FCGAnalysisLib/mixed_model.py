@@ -56,15 +56,16 @@ class OverloadSpecimen:
         self.n = []
         self.dk = []
         self.kc = []
+        self.fop = []
 
     def basic_result_calculate(self):
         _, width, notch_length, thickness, elastic_modulus, yield_strength, precrack_length = \
             read_data.ReadTestInf(sequence=self.name)
         cycles, cracklength, kmax, kmin, pmax, pmin, kc_Manual, pc_Manual = \
             read_data.ReadOriginResult(self.name, closure=True, cod=False)
-        dadn_Manual, n_Manual, dk_Manual, a_Manual, kop_Manual = \
+        dadn_Manual, n_Manual, dk_Manual, a_Manual, kop_Manual, fop_Manual = \
             experiment_calculation.FCGRandDKbyOriginalData(b=thickness, w=width, n=cycles, pmax=pmax, pmin=pmin,
-                                                           a=cracklength,
+                                                           a=cracklength, fop=pc_Manual,
                                                            ys=yield_strength, r=self.stress_ratio, kclosure=kc_Manual,
                                                            threshold=0)
         self.width = width
@@ -77,6 +78,7 @@ class OverloadSpecimen:
         self.dk = dk_Manual
         self.a = a_Manual
         self.kc = kop_Manual
+        self.fop = fop_Manual
 
     def load_condition_input(self, maxload, stress_ratio=1):
         self.maxload = maxload
@@ -135,6 +137,18 @@ class OverloadSpecimen:
             kc = mts_analysis.DataSelectByThreshold(threshold=upperlimit, parameter=a, data=kc, keepbigger=0)
             a = mts_analysis.DataSelectByThreshold(threshold=upperlimit, parameter=a, data=a, keepbigger=0)
         return np.array(dadn), np.array(dk), np.array(kc), np.array(n), np.array(a)
+
+
+class OPInfOverloadSpecimen(OverloadSpecimen):
+    # OverloadSpecimen的子类
+    # 增加为移动平均准备的位置
+    def __init__(self, name, stress_ratio=1):
+        super().__init__(name, stress_ratio=1)
+        self.ma_kop = []
+        self.ma_fop = []
+        self.ma_a = []
+        self.ma_dk = []
+        self.ma_dadn = []
 
 
 class FCGDataFromFigure:
@@ -204,7 +218,7 @@ class FCGDataFromFigure:
 
 def FigureDataReader(filename):
     # 利用定义的数据类，包括SIF和FCGR两项，类中定义函数读取从pandas Dataframe中读取数据
-    # 函数主体为循环，循环内定义类，讲类存储在数组中.
+    # 函数主体为循环，循环内定义类，将类存储在数组中.
     # 函数读取csv文件存入database的pandas dataframe中，再利用循环读取所有数据
     # 最后返回由类构成的数组
     inputfile = "\\inputfile\\figure_data\\"  # 读取文件放置的子文件夹名
