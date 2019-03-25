@@ -9,7 +9,8 @@ import sys
 
 factor_for_k = 1e3 * math.sqrt(1e-3)  # convert kN.mm**-2 to Mpa.m**-0.5
 inputfile = "\\inputfile\\"             # 读取文件放置的子文件夹名
-path = sys.path[0] + inputfile  # 设定读取的绝对路径
+#path = sys.path[0] + inputfile  # 设定读取的绝对路径
+path = "E:\\lyc\\python\\MTS_Data_analyse\\inputfile\\"     # 当采用类调用时
 
 
 def ReadMtsResult(sequence, dataselect=1, dkeffread=0):
