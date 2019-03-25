@@ -176,7 +176,7 @@ if moving_average:
     dk_1 = dk_temp[:]
     a_1 = a_temp[:]
 
-# 高载段参数计算，塑性区系数为Irwin
+# 高载段参数计算，塑性区系数由参数plz_factor指定
 kmax_1 = np.array([dk / (1 - specimen.stress_ratio) for dk in dk_1])
 plz_reverse_1 = overload_analysis.PlasticZoneWithFactor(kmax=kmax_1, ys=specimen.yield_stress,
                                                         factor=plz_factor, t=specimen.thickness)
